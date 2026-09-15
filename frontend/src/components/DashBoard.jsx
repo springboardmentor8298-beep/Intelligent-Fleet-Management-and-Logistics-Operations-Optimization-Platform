@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchMetrics, fetchVehicles } from '../api';
 import VehicleForm from './VehicleForm';
+import LogisticsBoard from './LogisticsBoard';
 
 export default function Dashboard({ user, onLogout }) {
   const [metrics, setMetrics] = useState(null);
@@ -44,6 +45,8 @@ export default function Dashboard({ user, onLogout }) {
         )}
 
         {['Administrator', 'Fleet Manager'].includes(user.role) && <VehicleForm onVehicleAdded={loadData} />}
+
+        <LogisticsBoard /> {/* Add this exact line! */}
 
         <div style={styles.tableCard}>
           <div style={{ padding: '20px', borderBottom: '1px solid #e5e7eb' }}>

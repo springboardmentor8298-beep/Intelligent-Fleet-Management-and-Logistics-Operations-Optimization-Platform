@@ -26,11 +26,11 @@ def register_vehicle(
     return db_vehicle
 
 @router.get("/", response_model=List[VehicleResponse])
-def list_vehicles(db: Session = Depends(get_db), _=Depends(get_current_user)):
+def list_vehicles(db: Session = Depends(get_db)):
     return db.query(Vehicle).order_by(Vehicle.id.desc()).all()
 
 @router.get("/metrics", response_model=FleetMetrics)
-def get_fleet_metrics(db: Session = Depends(get_db), _=Depends(get_current_user)):
+def get_fleet_metrics(db: Session = Depends(get_db)):
     total = db.query(Vehicle).count()
     available = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.AVAILABLE).count()
     in_transit = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.IN_TRANSIT).count()

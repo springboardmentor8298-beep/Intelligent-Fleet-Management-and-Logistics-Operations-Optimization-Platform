@@ -7,10 +7,12 @@ export default function Login({ onAuthSuccess }) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Fleet Manager');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
       if (isRegister) await registerUser({ email, password, role });
       const res = await loginUser(email, password);
@@ -18,28 +20,60 @@ export default function Login({ onAuthSuccess }) {
       localStorage.setItem('user', JSON.stringify(res.data));
       onAuthSuccess(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Authentication failed');
+      setError(err.response?.data?.detail || 'Authentication failed. Please verify credentials.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h2 style={styles.title}>{isRegister ? 'Create Account' : 'Welcome to FleetFlow'}</h2>
-        {error && <div style={styles.error}>{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email Address</label>
-            <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={styles.input} />
+    <div style={darkLoginStyles.container}>
+      {/* Background ambient glow */}
+      <div style={darkLoginStyles.ambientGlow} />
+
+      <div style={darkLoginStyles.card}>
+        <div style={darkLoginStyles.logoWrap}>
+          <div style={darkLoginStyles.logoIcon}>⚡</div>
+          <h1 style={darkLoginStyles.brand}>FLEETFLOW</h1>
+          <div style={darkLoginStyles.brandSub}>INTELLIGENT LOGISTICS PLATFORM</div>
+        </div>
+
+        <h2 style={darkLoginStyles.title}>{isRegister ? 'Register Platform Account' : 'Operator Portal Sign In'}</h2>
+        <p style={darkLoginStyles.subtitle}>
+          {isRegister ? 'Create commercial operator credentials' : 'Enter credentials to access live fleet dispatch console'}
+        </p>
+
+        {error && <div style={darkLoginStyles.error}>⚠️ {error}</div>}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <div>
+            <label style={darkLoginStyles.label}>Operator Email</label>
+            <input
+              required
+              type="email"
+              placeholder="e.g. dispatcher@fleetflow.io"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              style={darkLoginStyles.input}
+            />
           </div>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={styles.input} />
+
+          <div>
+            <label style={darkLoginStyles.label}>Access Password</label>
+            <input
+              required
+              type="password"
+              placeholder="••••••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={darkLoginStyles.input}
+            />
           </div>
+
           {isRegister && (
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Assigned Role</label>
-              <select value={role} onChange={(e) => setRole(e.target.value)} style={styles.input}>
+            <div>
+              <label style={darkLoginStyles.label}>Authorized Role</label>
+              <select value={role} onChange={(e) => setRole(e.target.value)} style={darkLoginStyles.input}>
                 <option value="Administrator">Administrator</option>
                 <option value="Fleet Manager">Fleet Manager</option>
                 <option value="Dispatcher">Dispatcher</option>
@@ -47,24 +81,149 @@ export default function Login({ onAuthSuccess }) {
               </select>
             </div>
           )}
-          <button type="submit" style={styles.btn}>{isRegister ? 'Register' : 'Sign In'}</button>
+
+          <button type="submit" disabled={loading} style={darkLoginStyles.btn}>
+            {loading ? 'Authenticating...' : (isRegister ? 'Register Operator Account' : 'Authenticate & Enter Console')}
+          </button>
         </form>
-        <p style={styles.toggle} onClick={() => setIsRegister(!isRegister)}>
-          {isRegister ? 'Already have an account? Sign in' : 'Need an account? Register'}
-        </p>
+
+        <div style={{ marginTop: '24px', textAlign: 'center' }}>
+          <span
+            style={darkLoginStyles.toggle}
+            onClick={() => { setIsRegister(!isRegister); setError(''); }}
+          >
+            {isRegister ? 'Already registered? Sign in here' : 'Need new operator credentials? Register'}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-const styles = {
-  container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
-  card: { width: '100%', maxWidth: '400px', background: '#ffffff', padding: '40px', borderRadius: '16px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', boxSizing: 'border-box' },
-  title: { margin: '0 0 24px 0', fontSize: '24px', fontWeight: '700', textAlign: 'center', color: '#111827' },
-  inputGroup: { marginBottom: '20px' },
-  label: { display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500', color: '#4b5563' },
-  input: { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '15px', boxSizing: 'border-box', outline: 'none' },
-  btn: { width: '100%', padding: '12px', background: '#2563eb', color: '#ffffff', fontSize: '16px', fontWeight: '600', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'background 0.2s' },
-  error: { background: '#fee2e2', color: '#b91c1c', padding: '12px', marginBottom: '20px', borderRadius: '8px', fontSize: '14px', textAlign: 'center' },
-  toggle: { marginTop: '24px', textAlign: 'center', cursor: 'pointer', color: '#2563eb', fontSize: '14px', fontWeight: '500' }
+const darkLoginStyles = {
+  container: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#05070a',
+    position: 'relative',
+    overflow: 'hidden',
+    padding: '24px'
+  },
+  ambientGlow: {
+    position: 'absolute',
+    width: '600px',
+    height: '600px',
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, rgba(99, 102, 241, 0.03) 50%, transparent 70%)',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    pointerEvents: 'none'
+  },
+  card: {
+    width: '100%',
+    maxWidth: '420px',
+    background: '#0d131f',
+    border: '1px solid #1e293b',
+    padding: '40px',
+    borderRadius: '16px',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+    position: 'relative',
+    zIndex: 10
+  },
+  logoWrap: {
+    textAlign: 'center',
+    marginBottom: '24px'
+  },
+  logoIcon: {
+    display: 'inline-flex',
+    width: '44px',
+    height: '44px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '22px',
+    color: '#fff',
+    boxShadow: '0 0 16px rgba(56, 189, 248, 0.4)',
+    marginBottom: '10px'
+  },
+  brand: {
+    margin: 0,
+    fontSize: '20px',
+    fontWeight: '800',
+    color: '#f8fafc',
+    letterSpacing: '1.5px'
+  },
+  brandSub: {
+    fontSize: '9px',
+    fontWeight: '700',
+    color: '#38bdf8',
+    letterSpacing: '2px',
+    marginTop: '2px'
+  },
+  title: {
+    margin: '0 0 6px 0',
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#f8fafc',
+    textAlign: 'center'
+  },
+  subtitle: {
+    margin: '0 0 20px 0',
+    fontSize: '13px',
+    color: '#94a3b8',
+    textAlign: 'center'
+  },
+  label: {
+    display: 'block',
+    marginBottom: '6px',
+    fontSize: '11px',
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase'
+  },
+  input: {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: '8px',
+    border: '1px solid #1e293b',
+    background: '#070a0f',
+    color: '#f8fafc',
+    fontSize: '14px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border 0.2s'
+  },
+  btn: {
+    width: '100%',
+    padding: '13px',
+    background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
+    color: '#06080d',
+    fontSize: '14px',
+    fontWeight: '800',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    marginTop: '6px',
+    boxShadow: '0 0 15px rgba(56, 189, 248, 0.35)'
+  },
+  error: {
+    background: 'rgba(248, 113, 113, 0.1)',
+    border: '1px solid rgba(248, 113, 113, 0.3)',
+    color: '#f87171',
+    padding: '10px 14px',
+    marginBottom: '16px',
+    borderRadius: '8px',
+    fontSize: '13px',
+    textAlign: 'center'
+  },
+  toggle: {
+    color: '#38bdf8',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer'
+  }
 };
