@@ -114,23 +114,23 @@ export default function VehicleForm({ onVehicleAdded, onClose }) {
 
 const darkFormStyles = {
   card: {
-    background: '#0d131f',
+    background: 'var(--bg-card, #0d131f)',
     padding: '24px',
     borderRadius: '14px',
-    border: '1px solid #1e293b',
-    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.4)',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    boxShadow: 'var(--shadow-card)',
     marginBottom: '28px'
   },
   title: {
     margin: 0,
     fontSize: '17px',
     fontWeight: '700',
-    color: '#f8fafc'
+    color: 'var(--text-primary, #f8fafc)'
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    color: '#94a3b8',
+    color: 'var(--text-muted, #94a3b8)',
     fontSize: '16px',
     cursor: 'pointer'
   },
@@ -143,7 +143,7 @@ const darkFormStyles = {
     display: 'block',
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase',
     marginBottom: '6px'
   },
@@ -151,9 +151,9 @@ const darkFormStyles = {
     width: '100%',
     padding: '10px 14px',
     borderRadius: '8px',
-    border: '1px solid #1e293b',
-    background: '#070a0f',
-    color: '#f8fafc',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    background: 'var(--bg-card-sub, #070a0f)',
+    color: 'var(--text-primary, #f8fafc)',
     fontSize: '13px',
     outline: 'none',
     boxSizing: 'border-box'

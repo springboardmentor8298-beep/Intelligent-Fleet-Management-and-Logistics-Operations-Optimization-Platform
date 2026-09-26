@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { fetchVehicles } from '../api';
+import {
+  fetchVehicles,
+  fetchDrivers,
+  createDriver,
+  assignDriverVehicle,
+  unassignDriverVehicle,
+  updateDriverStatus as apiUpdateDriverStatus
+} from '../api';
 import {
   getStoredDrivers,
+  saveStoredDrivers,
   assignFleetToDriver,
   updateDriverDutyStatus,
   registerNewDriver
@@ -37,13 +45,37 @@ export default function DriversPage({ user }) {
     };
     window.addEventListener('fleetflow_drivers_updated', handleSync);
 
-    // Fetch registered fleet assets from API
+    // Fetch registered fleet assets and drivers from API
     loadRegistryVehicles();
+    loadDriversFromBackend();
 
     return () => {
       window.removeEventListener('fleetflow_drivers_updated', handleSync);
     };
   }, []);
+
+  const loadDriversFromBackend = async () => {
+    try {
+      const res = await fetchDrivers();
+      if (res.data && res.data.length > 0) {
+        const mapped = res.data.map(d => ({
+          id: d.driver_code || `DRV-${d.id}`,
+          db_id: d.id,
+          name: d.name,
+          license: d.license_type || d.license_number,
+          vehicle: d.current_vehicle_id || 'None',
+          trips: d.total_trips || 0,
+          rating: d.rating || 5.0,
+          status: d.status || 'Available',
+          attendance: d.status === 'Off Duty' ? 'Off Shift' : 'Present'
+        }));
+        setDrivers(mapped);
+        saveStoredDrivers(mapped);
+      }
+    } catch (err) {
+      console.warn('Backend drivers API unreachable, using local store', err);
+    }
+  };
 
   const loadRegistryVehicles = async () => {
     try {
@@ -62,13 +94,24 @@ export default function DriversPage({ user }) {
     setTimeout(() => setToastMessage(null), 5000);
   };
 
-  const handleAddDriver = (e) => {
+  const handleAddDriver = async (e) => {
     e.preventDefault();
-    const updated = registerNewDriver(newDriver);
-    setDrivers(updated);
+    try {
+      await createDriver({
+        name: newDriver.name,
+        license_number: `LIC-${Math.floor(10000 + Math.random() * 89999)}`,
+        license_type: newDriver.license || 'CDL-A',
+        current_vehicle_id: newDriver.vehicle !== 'None' ? newDriver.vehicle : null
+      });
+      showToast(`Registered new commercial driver in database: ${newDriver.name}`);
+      loadDriversFromBackend();
+    } catch (err) {
+      const updated = registerNewDriver(newDriver);
+      setDrivers(updated);
+      showToast(`Registered new commercial driver locally: ${newDriver.name}`);
+    }
     setShowAddModal(false);
     setNewDriver({ name: '', license: '', vehicle: 'None' });
-    showToast(`Registered new commercial driver: ${newDriver.name}`);
   };
 
   const handleOpenAssignModal = (driver) => {
@@ -80,23 +123,54 @@ export default function DriversPage({ user }) {
     setSelectedFleetId(driver.vehicle === 'None' ? '' : driver.vehicle);
   };
 
-  const handleConfirmFleetAssignment = (e) => {
+  const handleConfirmFleetAssignment = async (e) => {
     e.preventDefault();
     if (!assigningDriver) return;
 
-    const result = assignFleetToDriver(assigningDriver.id, selectedFleetId || 'None', currentUserRole);
-    if (!result.success) {
-      showToast(result.error, true);
-      return;
-    }
+    const chosenVehicle = selectedFleetId || 'None';
+    const vehicleLabel = chosenVehicle && chosenVehicle !== 'None' ? `Fleet Asset ${chosenVehicle}` : 'Unassigned';
 
-    setDrivers(result.drivers);
-    const vehicleLabel = selectedFleetId && selectedFleetId !== 'None' ? `Fleet Asset ${selectedFleetId}` : 'Unassigned';
-    showToast(`Successfully assigned ${vehicleLabel} to driver ${assigningDriver.name}.`);
+    try {
+      if (assigningDriver.db_id) {
+        if (chosenVehicle && chosenVehicle !== 'None') {
+          await assignDriverVehicle(assigningDriver.db_id, chosenVehicle);
+        } else {
+          await unassignDriverVehicle(assigningDriver.db_id);
+        }
+        await loadDriversFromBackend();
+      } else {
+        const result = assignFleetToDriver(assigningDriver.id, chosenVehicle, currentUserRole);
+        if (!result.success) {
+          showToast(result.error, true);
+          return;
+        }
+        setDrivers(result.drivers);
+      }
+      showToast(`Successfully assigned ${vehicleLabel} to driver ${assigningDriver.name}.`);
+    } catch (err) {
+      const result = assignFleetToDriver(assigningDriver.id, chosenVehicle, currentUserRole);
+      if (result.success) {
+        setDrivers(result.drivers);
+        showToast(`Assigned ${vehicleLabel} locally: ${err.response?.data?.detail || ''}`);
+      } else {
+        showToast(result.error, true);
+      }
+    }
     setAssigningDriver(null);
   };
 
-  const handleStatusChange = (driverId, newStatus) => {
+  const handleStatusChange = async (driverId, newStatus) => {
+    const dObj = drivers.find(d => d.id === driverId);
+    if (dObj && dObj.db_id) {
+      try {
+        await apiUpdateDriverStatus(dObj.db_id, newStatus);
+        await loadDriversFromBackend();
+        showToast(`Updated duty status for ${dObj.name} to: ${newStatus}`);
+        return;
+      } catch (err) {
+        console.warn('API status update failed, applying locally', err);
+      }
+    }
     const updated = updateDriverDutyStatus(driverId, newStatus);
     setDrivers(updated);
     const driver = updated.find(d => d.id === driverId);
@@ -222,7 +296,7 @@ export default function DriversPage({ user }) {
                     <td style={{ ...driverStyles.td, fontWeight: '700', color: '#38bdf8', fontFamily: 'JetBrains Mono' }}>
                       {d.id}
                     </td>
-                    <td style={{ ...driverStyles.td, fontWeight: '700', color: '#f8fafc' }}>
+                    <td style={{ ...driverStyles.td, fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>
                       👨‍✈️ {d.name}
                       {d.lastAssignedShipment && (
                         <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal', marginTop: '2px' }}>
@@ -300,10 +374,10 @@ export default function DriversPage({ user }) {
                           cursor: 'pointer'
                         }}
                       >
-                        <option value="Available" style={{ background: '#0d131f', color: '#34d399' }}>Available</option>
-                        <option value="On Duty" style={{ background: '#0d131f', color: '#38bdf8' }}>On Duty</option>
-                        <option value="On Trip" style={{ background: '#0d131f', color: '#38bdf8' }}>On Trip</option>
-                        <option value="Off Duty" style={{ background: '#0d131f', color: '#f87171' }}>Off Duty</option>
+                        <option value="Available" style={{ background: 'var(--bg-card, #0d131f)', color: '#34d399' }}>Available</option>
+                        <option value="On Duty" style={{ background: 'var(--bg-card, #0d131f)', color: '#38bdf8' }}>On Duty</option>
+                        <option value="On Trip" style={{ background: 'var(--bg-card, #0d131f)', color: '#38bdf8' }}>On Trip</option>
+                        <option value="Off Duty" style={{ background: 'var(--bg-card, #0d131f)', color: '#f87171' }}>Off Duty</option>
                       </select>
                       {d.status === 'Off Duty' && (
                         <div style={{ fontSize: '10px', color: '#f87171', marginTop: '3px' }}>
@@ -323,9 +397,9 @@ export default function DriversPage({ user }) {
                           borderRadius: '6px',
                           fontSize: '11px',
                           fontWeight: '700',
-                          background: isFleetManager ? 'rgba(56, 189, 248, 0.12)' : '#1e293b',
-                          color: isFleetManager ? '#38bdf8' : '#64748b',
-                          border: isFleetManager ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid #334155',
+                          background: isFleetManager ? 'rgba(56, 189, 248, 0.12)' : 'var(--bg-card-hover, #1e293b)',
+                          color: isFleetManager ? '#38bdf8' : 'var(--text-muted, #64748b)',
+                          border: isFleetManager ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid var(--border-subtle, #334155)',
                           cursor: isFleetManager ? 'pointer' : 'not-allowed',
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -462,27 +536,27 @@ const driverStyles = {
   page: { maxWidth: '1280px', margin: '0 auto', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '24px' },
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' },
   subtitle: { fontSize: '11px', fontWeight: '800', color: '#fbbf24', letterSpacing: '1px', marginBottom: '4px' },
-  title: { margin: 0, fontSize: '26px', fontWeight: '800', color: '#f8fafc' },
-  desc: { margin: '6px 0 0 0', fontSize: '13px', color: '#94a3b8' },
+  title: { margin: 0, fontSize: '26px', fontWeight: '800', color: 'var(--text-primary, #f8fafc)' },
+  desc: { margin: '6px 0 0 0', fontSize: '13px', color: 'var(--text-secondary, #94a3b8)' },
   addBtn: { background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', color: '#06080d', border: 'none', padding: '12px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: '800', cursor: 'pointer' },
   metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' },
-  metricBox: { background: '#0d131f', border: '1px solid #1e293b', padding: '16px', borderRadius: '12px' },
-  metricLabel: { fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase' },
-  metricNum: { fontSize: '26px', fontWeight: '800', color: '#f8fafc', marginTop: '4px', fontFamily: 'JetBrains Mono' },
-  tableCard: { background: '#0d131f', border: '1px solid #1e293b', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)' },
-  tableHeaderBanner: { padding: '14px 20px', background: '#090d15', borderBottom: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  metricBox: { background: 'var(--bg-card, #0d131f)', border: '1px solid var(--border-subtle, #1e293b)', padding: '16px', borderRadius: '12px', boxShadow: 'var(--shadow-card)' },
+  metricLabel: { fontSize: '11px', color: 'var(--text-muted, #64748b)', fontWeight: '700', textTransform: 'uppercase' },
+  metricNum: { fontSize: '26px', fontWeight: '800', color: 'var(--text-primary, #f8fafc)', marginTop: '4px', fontFamily: 'JetBrains Mono' },
+  tableCard: { background: 'var(--bg-card, #0d131f)', border: '1px solid var(--border-subtle, #1e293b)', borderRadius: '14px', overflow: 'hidden', boxShadow: 'var(--shadow-card)' },
+  tableHeaderBanner: { padding: '14px 20px', background: 'var(--bg-table-header, #090d15)', borderBottom: '1px solid var(--border-subtle, #1e293b)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
-  thRow: { background: '#090d15', borderBottom: '1px solid #1e293b' },
-  th: { padding: '14px 16px', fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' },
-  tr: { borderBottom: '1px solid #131b2b' },
-  td: { padding: '16px', fontSize: '13px', color: '#cbd5e1' },
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(5, 7, 10, 0.75)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
-  modal: { background: '#0d131f', border: '1px solid #1e293b', padding: '24px', borderRadius: '14px', width: '90%', maxWidth: '480px' },
-  label: { display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '6px', textTransform: 'uppercase' },
-  input: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #1e293b', background: '#070a0f', color: '#f8fafc', fontSize: '13px', outline: 'none', boxSizing: 'border-box' },
-  select: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #1e293b', background: '#070a0f', color: '#f8fafc', fontSize: '13px', outline: 'none', boxSizing: 'border-box' },
+  thRow: { background: 'var(--bg-table-header, #090d15)', borderBottom: '1px solid var(--border-subtle, #1e293b)' },
+  th: { padding: '14px 16px', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' },
+  tr: { borderBottom: '1px solid var(--border-subtle, #131b2b)' },
+  td: { padding: '16px', fontSize: '13px', color: 'var(--text-secondary, #cbd5e1)' },
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--modal-overlay, rgba(5, 7, 10, 0.75))', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
+  modal: { background: 'var(--bg-card, #0d131f)', border: '1px solid var(--border-subtle, #1e293b)', padding: '24px', borderRadius: '14px', width: '90%', maxWidth: '480px', boxShadow: 'var(--shadow-card)' },
+  label: { display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted, #64748b)', marginBottom: '6px', textTransform: 'uppercase' },
+  input: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle, #1e293b)', background: 'var(--bg-card-sub, #070a0f)', color: 'var(--text-primary, #f8fafc)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' },
+  select: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle, #1e293b)', background: 'var(--bg-card-sub, #070a0f)', color: 'var(--text-primary, #f8fafc)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' },
   submitBtn: { background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)', color: '#ffffff', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: '800', fontSize: '13px', cursor: 'pointer' },
-  cancelBtn: { background: 'transparent', color: '#94a3b8', border: '1px solid #1e293b', padding: '10px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
+  cancelBtn: { background: 'transparent', color: 'var(--text-secondary, #94a3b8)', border: '1px solid var(--border-subtle, #1e293b)', padding: '10px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
   toast: { position: 'fixed', top: '20px', right: '20px', zIndex: 10000, padding: '12px 18px', borderRadius: '10px', color: '#ffffff', fontSize: '13px', fontWeight: '700', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid' },
   toastClose: { background: 'none', border: 'none', color: '#ffffff', fontSize: '16px', cursor: 'pointer' }
 };

@@ -319,15 +319,15 @@ export default function LiveTrackingMap({
         position: 'absolute',
         bottom: '14px',
         left: '14px',
-        background: 'rgba(15, 23, 42, 0.92)',
+        background: 'var(--bg-card, rgba(15, 23, 42, 0.92))',
         backdropFilter: 'blur(8px)',
-        border: '1px solid #334155',
+        border: '1px solid var(--border-subtle, #334155)',
         padding: '7px 14px',
         borderRadius: '8px',
         fontSize: '11px',
         fontWeight: '600',
-        color: '#f8fafc',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        color: 'var(--text-primary, #f8fafc)',
+        boxShadow: 'var(--shadow-card)',
         zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
@@ -349,7 +349,7 @@ export default function LiveTrackingMap({
         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span>🚚</span> Vehicle
         </span>
-        <span style={{ color: '#38bdf8', fontSize: '11px', borderLeft: '1px solid #334155', paddingLeft: '10px', maxWidth: '260px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ color: '#38bdf8', fontSize: '11px', borderLeft: '1px solid var(--border-subtle, #334155)', paddingLeft: '10px', maxWidth: '260px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {origin && destination ? `${origin.label || 'Origin'} ➔ ${destination.label || 'Destination'}` : 'Global Satellite Corridor'}
         </span>
       </div>

@@ -141,9 +141,9 @@ export default function RoutesPage() {
                 key={preset.name}
                 onClick={() => selectCorridor(preset)}
                 style={{
-                  background: isActive ? '#0284c7' : '#162030',
-                  color: isActive ? '#ffffff' : '#94a3b8',
-                  border: `1px solid ${isActive ? '#38bdf8' : '#334155'}`,
+                  background: isActive ? '#0284c7' : 'var(--bg-card-sub, #162030)',
+                  color: isActive ? '#ffffff' : 'var(--text-secondary, #94a3b8)',
+                  border: `1px solid ${isActive ? '#38bdf8' : 'var(--border-subtle, #334155)'}`,
                   borderRadius: '9999px',
                   padding: '6px 12px',
                   fontSize: '11px',
@@ -175,14 +175,14 @@ export default function RoutesPage() {
                 onClick={() => setSelectedStrategy(strat.key)}
                 style={{
                   ...routeStyles.stratCard,
-                  borderColor: isSelected ? strat.color : '#1e293b',
-                  background: isSelected ? 'rgba(30, 41, 59, 0.7)' : '#0d131f'
+                  borderColor: isSelected ? strat.color : 'var(--border-subtle, #1e293b)',
+                  background: isSelected ? 'var(--bg-card-hover, rgba(30, 41, 59, 0.7))' : 'var(--bg-card, #0d131f)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '20px' }}>{strat.icon}</span>
-                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>{strat.title}</span>
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>{strat.title}</span>
                   </div>
                   <span style={{ fontSize: '10px', fontWeight: '700', padding: '3px 6px', borderRadius: '4px', background: `${strat.color}20`, color: strat.color }}>
                     {strat.badge}
@@ -192,18 +192,18 @@ export default function RoutesPage() {
                 {data ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>Road Distance:</span>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: '#f8fafc', fontFamily: 'JetBrains Mono' }}>{data.total_distance_km} km</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)' }}>Road Distance:</span>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)', fontFamily: 'JetBrains Mono' }}>{data.total_distance_km} km</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>Est. Travel Time:</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)' }}>Est. Travel Time:</span>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: strat.color, fontFamily: 'JetBrains Mono' }}>{data.estimated_duration_mins} mins</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>Fuel Consumption:</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)' }}>Fuel Consumption:</span>
                       <span style={{ fontSize: '13px', fontWeight: '700', color: '#34d399', fontFamily: 'JetBrains Mono' }}>{data.estimated_fuel_liters} L</span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#94a3b8', borderTop: '1px solid #1e293b', paddingTop: '8px', marginTop: '4px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', borderTop: '1px solid var(--border-subtle, #1e293b)', paddingTop: '8px', marginTop: '4px' }}>
                       {data.profile_description}
                     </div>
                   </div>
@@ -221,10 +221,10 @@ export default function RoutesPage() {
       {/* Active Scheduled Trips Table */}
       <div style={routeStyles.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#f8fafc' }}>
+          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>
             Active Scheduled Logistics Trips
           </h2>
-          <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)' }}>
             {trips.length} Trips in System
           </span>
         </div>
@@ -342,12 +342,12 @@ const routeStyles = {
     margin: 0,
     fontSize: '24px',
     fontWeight: '800',
-    color: '#f8fafc'
+    color: 'var(--text-primary, #f8fafc)'
   },
   desc: {
     margin: '6px 0 0 0',
     fontSize: '13px',
-    color: '#94a3b8'
+    color: 'var(--text-secondary, #94a3b8)'
   },
   primaryBtn: {
     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -361,16 +361,16 @@ const routeStyles = {
     boxShadow: '0 0 15px rgba(16, 185, 129, 0.35)'
   },
   card: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '16px',
     padding: '24px',
-    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)'
+    boxShadow: 'var(--shadow-card)'
   },
   recalculateBtn: {
-    background: '#162030',
+    background: 'var(--bg-card-hover, #162030)',
     color: '#38bdf8',
-    border: '1px solid #1e3a5f',
+    border: '1px solid var(--border-subtle, #1e3a5f)',
     padding: '8px 14px',
     borderRadius: '6px',
     fontSize: '12px',
@@ -383,7 +383,7 @@ const routeStyles = {
     gap: '16px'
   },
   stratCard: {
-    border: '1px solid #1e293b',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '12px',
     padding: '18px',
     cursor: 'pointer',
@@ -395,22 +395,22 @@ const routeStyles = {
     textAlign: 'left'
   },
   thRow: {
-    background: '#090d15',
-    borderBottom: '1px solid #1e293b'
+    background: 'var(--bg-table-header, #090d15)',
+    borderBottom: '1px solid var(--border-subtle, #1e293b)'
   },
   th: {
     padding: '14px 16px',
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase'
   },
   tr: {
-    borderBottom: '1px solid #131b2b'
+    borderBottom: '1px solid var(--border-subtle, #131b2b)'
   },
   td: {
     padding: '16px',
     fontSize: '13px',
-    color: '#cbd5e1'
+    color: 'var(--text-secondary, #cbd5e1)'
   }
 };

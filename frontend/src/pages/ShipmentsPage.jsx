@@ -353,7 +353,7 @@ export default function ShipmentsPage() {
       {/* Quick Shipment Creation Panel */}
       {showCreateForm && (
         <form onSubmit={handleCreateSubmit} style={shipStyles.createCard}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#f8fafc', fontWeight: '700' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-primary, #f8fafc)', fontWeight: '700' }}>
             Register New Consignment & Initialize Route
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '16px' }}>
@@ -439,9 +439,9 @@ export default function ShipmentsPage() {
                     borderRadius: '8px',
                     fontSize: '11px',
                     fontWeight: '700',
-                    background: '#1e293b',
+                    background: 'var(--bg-card-hover, #1e293b)',
                     color: '#38bdf8',
-                    border: '1px solid #334155',
+                    border: '1px solid var(--border-subtle, #334155)',
                     cursor: 'pointer'
                   }}
                 >
@@ -496,11 +496,11 @@ export default function ShipmentsPage() {
 
             <div style={shipStyles.etaBox}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8' }}>Dynamic ETA:</span>
-                <span style={{ fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>{telemetry.eta}</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)' }}>Dynamic ETA:</span>
+                <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>{telemetry.eta}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                <span style={{ fontSize: '12px', color: '#94a3b8' }}>Traffic Corridor:</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)' }}>Traffic Corridor:</span>
                 <span style={{ fontSize: '12px', fontWeight: '700', color: telemetry.is_delayed ? '#f87171' : '#34d399' }}>
                   {telemetry.is_delayed ? '⚠️ Congestion Detected' : '🟢 Optimal Traffic Flow'}
                 </span>
@@ -533,7 +533,7 @@ export default function ShipmentsPage() {
       {/* Shipment Registry Section */}
       <div style={shipStyles.registryCard}>
         <div style={shipStyles.registryHeader}>
-          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#f8fafc' }}>
+          <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>
             Consignment Tracking Registry
           </h2>
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
@@ -675,12 +675,12 @@ const shipStyles = {
     margin: 0,
     fontSize: '24px',
     fontWeight: '800',
-    color: '#f8fafc'
+    color: 'var(--text-primary, #f8fafc)'
   },
   desc: {
     margin: '6px 0 0 0',
     fontSize: '13px',
-    color: '#94a3b8'
+    color: 'var(--text-secondary, #94a3b8)'
   },
   livePill: {
     background: 'rgba(16, 185, 129, 0.12)',
@@ -704,9 +704,9 @@ const shipStyles = {
     boxShadow: '0 0 15px rgba(99, 102, 241, 0.3)'
   },
   newShipmentBtn: {
-    background: '#162030',
+    background: 'var(--bg-card-hover, #162030)',
     color: '#38bdf8',
-    border: '1px solid #1e3a5f',
+    border: '1px solid var(--border-subtle, #1e3a5f)',
     padding: '11px 20px',
     borderRadius: '8px',
     fontSize: '13px',
@@ -714,17 +714,17 @@ const shipStyles = {
     cursor: 'pointer'
   },
   createCard: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '14px',
     padding: '24px',
-    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.5)'
+    boxShadow: 'var(--shadow-card)'
   },
   formLabel: {
     display: 'block',
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase',
     marginBottom: '6px'
   },
@@ -732,9 +732,9 @@ const shipStyles = {
     width: '100%',
     padding: '10px 14px',
     borderRadius: '8px',
-    border: '1px solid #1e293b',
-    background: '#070a0f',
-    color: '#f8fafc',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    background: 'var(--bg-card-sub, #070a0f)',
+    color: 'var(--text-primary, #f8fafc)',
     fontSize: '13px',
     outline: 'none',
     boxSizing: 'border-box'
@@ -755,51 +755,52 @@ const shipStyles = {
     gap: '20px'
   },
   mapCard: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '14px',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    boxShadow: 'var(--shadow-card)'
   },
   telemetryCard: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '14px',
     padding: '24px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)'
+    boxShadow: 'var(--shadow-card)'
   },
   telemetryHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid #1e293b',
+    borderBottom: '1px solid var(--border-subtle, #1e293b)',
     paddingBottom: '14px',
     marginBottom: '16px'
   },
   statBox: {
-    background: '#070a0f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card-sub, #070a0f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '14px',
     borderRadius: '10px',
     textAlign: 'center'
   },
   statLabel: {
     fontSize: '11px',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     fontWeight: '600'
   },
   statNum: {
     fontSize: '22px',
     fontWeight: '800',
-    color: '#f8fafc',
+    color: 'var(--text-primary, #f8fafc)',
     marginTop: '4px',
     fontFamily: 'JetBrains Mono'
   },
   etaBox: {
-    background: '#070a0f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card-sub, #070a0f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '16px',
     borderRadius: '10px',
     marginBottom: '16px'
@@ -825,11 +826,11 @@ const shipStyles = {
     boxShadow: '0 0 15px rgba(56, 189, 248, 0.35)'
   },
   registryCard: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '14px',
     overflow: 'hidden',
-    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)'
+    boxShadow: 'var(--shadow-card)'
   },
   registryHeader: {
     display: 'flex',
@@ -838,20 +839,20 @@ const shipStyles = {
     flexWrap: 'wrap',
     gap: '12px',
     padding: '20px',
-    borderBottom: '1px solid #1e293b'
+    borderBottom: '1px solid var(--border-subtle, #1e293b)'
   },
   filterTab: {
     padding: '6px 12px',
     borderRadius: '6px',
-    border: '1px solid #1e293b',
-    background: '#070a0f',
-    color: '#94a3b8',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    background: 'var(--bg-card-sub, #070a0f)',
+    color: 'var(--text-secondary, #94a3b8)',
     fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer'
   },
   activeFilterTab: {
-    background: '#1e293b',
+    background: 'var(--bg-card-hover, #1e293b)',
     color: '#38bdf8',
     border: '1px solid #38bdf8'
   },
@@ -861,28 +862,28 @@ const shipStyles = {
     textAlign: 'left'
   },
   thRow: {
-    background: '#090d15',
-    borderBottom: '1px solid #1e293b'
+    background: 'var(--bg-table-header, #090d15)',
+    borderBottom: '1px solid var(--border-subtle, #1e293b)'
   },
   th: {
     padding: '14px 18px',
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase'
   },
   tr: {
-    borderBottom: '1px solid #131b2b'
+    borderBottom: '1px solid var(--border-subtle, #131b2b)'
   },
   td: {
     padding: '16px 18px',
     fontSize: '13px',
-    color: '#cbd5e1'
+    color: 'var(--text-secondary, #cbd5e1)'
   },
   viewMapBtn: {
-    background: '#162030',
-    color: '#94a3b8',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card-hover, #162030)',
+    color: 'var(--text-secondary, #94a3b8)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '6px 12px',
     borderRadius: '6px',
     fontSize: '12px',
@@ -900,9 +901,9 @@ const shipStyles = {
     cursor: 'pointer'
   },
   timelineBtn: {
-    background: '#111722',
-    color: '#94a3b8',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card-sub, #111722)',
+    color: 'var(--text-secondary, #94a3b8)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '6px 10px',
     borderRadius: '6px',
     fontSize: '12px',

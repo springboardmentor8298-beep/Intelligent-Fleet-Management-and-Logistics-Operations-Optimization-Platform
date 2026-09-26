@@ -1,7 +1,10 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from datetime import datetime
-from app.models import UserRole, VehicleStatus, ShipmentStatus, TripStatus, RouteOptimizationType
+from app.models import (
+    UserRole, VehicleStatus, ShipmentStatus, TripStatus, RouteOptimizationType,
+    MaintenanceStatus, MaintenancePriority, DriverStatus, AlertSeverity
+)
 
 # --- User Schemas ---
 class UserCreate(BaseModel):
@@ -155,3 +158,191 @@ class LiveTelemetryPayload(BaseModel):
     longitude: float
     speed_kmh: Optional[float] = 45.0
     heading_deg: Optional[float] = 0.0
+
+# --- Milestone 3: Maintenance Management Schemas ---
+class MaintenanceCreate(BaseModel):
+    vehicle_id: str
+    category: str
+    service_center: Optional[str] = "Central Fleet Depot"
+    priority: Optional[MaintenancePriority] = MaintenancePriority.MEDIUM
+    scheduled_date: Optional[datetime] = None
+    estimated_cost: Optional[float] = 0.0
+    odometer_reading: Optional[float] = 0.0
+    notes: Optional[str] = None
+
+class MaintenanceUpdate(BaseModel):
+    status: Optional[MaintenanceStatus] = None
+    priority: Optional[MaintenancePriority] = None
+    actual_cost: Optional[float] = None
+    completed_date: Optional[datetime] = None
+    performed_by: Optional[str] = None
+    notes: Optional[str] = None
+    next_service_odometer: Optional[float] = None
+    next_service_date: Optional[datetime] = None
+
+class MaintenanceResponse(BaseModel):
+    id: int
+    job_id: str
+    vehicle_id: str
+    category: str
+    service_center: str
+    status: MaintenanceStatus
+    priority: MaintenancePriority
+    scheduled_date: datetime
+    completed_date: Optional[datetime] = None
+    estimated_cost: float
+    actual_cost: Optional[float] = None
+    odometer_reading: float
+    next_service_odometer: Optional[float] = None
+    next_service_date: Optional[datetime] = None
+    performed_by: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class MaintenanceAlertResponse(BaseModel):
+    id: int
+    vehicle_id: str
+    alert_type: str
+    severity: AlertSeverity
+    message: str
+    is_resolved: bool
+    resolved_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class MaintenanceReportSummary(BaseModel):
+    total_jobs: int
+    scheduled_jobs: int
+    in_progress_jobs: int
+    completed_jobs: int
+    total_maintenance_cost: float
+    active_alerts_count: int
+    cost_by_category: Dict[str, float]
+
+# --- Milestone 3: Driver Management Schemas ---
+class DriverCreate(BaseModel):
+    driver_code: Optional[str] = None
+    name: str
+    license_number: str
+    license_type: Optional[str] = "CDL-A"
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    current_vehicle_id: Optional[str] = None
+
+class DriverUpdate(BaseModel):
+    name: Optional[str] = None
+    license_type: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    status: Optional[DriverStatus] = None
+    rating: Optional[float] = None
+
+class DriverStatusUpdate(BaseModel):
+    status: DriverStatus
+
+class DriverAssignmentRequest(BaseModel):
+    vehicle_id: Optional[str] = None  # None/empty string or 'None' to unassign
+    notes: Optional[str] = None
+
+class DriverAssignmentHistoryResponse(BaseModel):
+    id: int
+    driver_id: int
+    vehicle_id: str
+    assigned_at: datetime
+    unassigned_at: Optional[datetime] = None
+    assigned_by: str
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class DriverResponse(BaseModel):
+    id: int
+    driver_code: str
+    name: str
+    license_number: str
+    license_type: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    status: DriverStatus
+    current_vehicle_id: Optional[str] = None
+    rating: float
+    total_trips: int
+    total_hours_driven: float
+    safety_score: float
+    last_assigned_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Milestone 3: Fuel Monitoring Schemas ---
+class FuelLogCreate(BaseModel):
+    vehicle_id: str
+    liters_filled: float
+    cost_per_liter: float
+    odometer_reading: float
+    trip_id: Optional[int] = None
+    fuel_type: Optional[str] = "Diesel"
+    fuel_station: Optional[str] = "Fleet Fueling Depot"
+
+class FuelLogResponse(BaseModel):
+    id: int
+    vehicle_id: str
+    trip_id: Optional[int] = None
+    liters_filled: float
+    cost_per_liter: float
+    total_cost: float
+    odometer_reading: float
+    fuel_type: str
+    fuel_station: Optional[str] = None
+    fuel_efficiency_km_per_l: Optional[float] = None
+    is_anomaly: bool
+    anomaly_reason: Optional[str] = None
+    logged_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class FuelAnalyticsResponse(BaseModel):
+    total_liters: float
+    total_fuel_cost: float
+    average_efficiency_km_per_l: float
+    average_consumption_l_per_100km: float
+    fuel_cost_per_km: float
+    eco_route_savings_liters: float
+    eco_route_savings_usd: float
+    anomalies_detected: int
+    vehicle_fuel_breakdown: List[Dict[str, Any]]
+    anomalies: List[FuelLogResponse]
+
+# --- Milestone 3: Operational Analytics & Dashboard Schemas ---
+class OperationalOverviewResponse(BaseModel):
+    total_fleet_size: int
+    active_fleet_count: int
+    maintenance_fleet_count: int
+    fleet_utilization_rate: float
+    on_time_delivery_rate: float
+    total_shipments_delivered: int
+    total_distance_km: float
+    total_fuel_consumed_liters: float
+    total_maintenance_spend: float
+    active_maintenance_alerts: int
+
+class FleetUtilizationResponse(BaseModel):
+    overall_utilization: float
+    by_vehicle_type: List[Dict[str, Any]]
+    status_distribution: Dict[str, int]
+
+class FleetPerformanceResponse(BaseModel):
+    reliability_index: float
+    on_time_delivery_rate: float
+    average_transit_minutes: float
+    incident_delay_rate: float
+    top_performing_drivers: List[Dict[str, Any]]
+    highest_maintenance_vehicles: List[Dict[str, Any]]

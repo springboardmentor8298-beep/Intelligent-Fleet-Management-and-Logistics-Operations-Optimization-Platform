@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Enum, DateTime, ForeignKey, Text, JSON, TypeDecorator
+from sqlalchemy import Column, Integer, String, Float, Enum, DateTime, ForeignKey, Text, JSON, TypeDecorator, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -80,6 +80,31 @@ class RouteOptimizationType(str, enum.Enum):
     TRAFFIC_AVOIDANCE = "Traffic Avoidance"
     FUEL_EFFICIENT = "Fuel Efficient Route"
 
+class MaintenanceStatus(str, enum.Enum):
+    SCHEDULED = "Scheduled"
+    IN_PROGRESS = "In Progress"
+    COMPLETED = "Completed"
+    CANCELLED = "Cancelled"
+
+class MaintenancePriority(str, enum.Enum):
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+    CRITICAL = "Critical"
+
+class DriverStatus(str, enum.Enum):
+    AVAILABLE = "Available"
+    ON_TRIP = "On Trip"
+    ON_DUTY = "On Duty"
+    OFF_DUTY = "Off Duty"
+    SUSPENDED = "Suspended"
+
+class AlertSeverity(str, enum.Enum):
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+    CRITICAL = "Critical"
+
 class User(Base):
     __tablename__ = "users"
 
@@ -103,10 +128,15 @@ class Vehicle(Base):
     status = Column(FlexibleEnum(VehicleStatus), default=VehicleStatus.AVAILABLE, nullable=False)
     current_lat = Column(Float, default=13.0827)
     current_lng = Column(Float, default=80.2707)
+    odometer_km = Column(Float, default=15000.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     shipments = relationship("Shipment", back_populates="vehicle")
     trips = relationship("Trip", back_populates="vehicle")
+    maintenance_logs = relationship("MaintenanceLog", back_populates="vehicle", cascade="all, delete-orphan")
+    maintenance_alerts = relationship("MaintenanceAlert", back_populates="vehicle", cascade="all, delete-orphan")
+    fuel_logs = relationship("FuelLog", back_populates="vehicle", cascade="all, delete-orphan")
+    drivers = relationship("Driver", back_populates="current_vehicle")
 
 class Trip(Base):
     __tablename__ = "trips"
@@ -195,3 +225,96 @@ class GPSBreadcrumb(Base):
     recorded_at = Column(DateTime, default=datetime.utcnow)
 
     trip = relationship("Trip", back_populates="breadcrumbs")
+
+class MaintenanceLog(Base):
+    __tablename__ = "maintenance_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String, unique=True, index=True, nullable=False)
+    vehicle_id = Column(String, ForeignKey("vehicles.vehicle_id"), nullable=False)
+    category = Column(String, nullable=False)
+    service_center = Column(String, default="Central Fleet Depot")
+    status = Column(FlexibleEnum(MaintenanceStatus), default=MaintenanceStatus.SCHEDULED, nullable=False)
+    priority = Column(FlexibleEnum(MaintenancePriority), default=MaintenancePriority.MEDIUM, nullable=False)
+    scheduled_date = Column(DateTime, default=datetime.utcnow)
+    completed_date = Column(DateTime, nullable=True)
+    estimated_cost = Column(Float, default=0.0)
+    actual_cost = Column(Float, nullable=True)
+    odometer_reading = Column(Float, default=0.0)
+    next_service_odometer = Column(Float, nullable=True)
+    next_service_date = Column(DateTime, nullable=True)
+    performed_by = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    vehicle = relationship("Vehicle", back_populates="maintenance_logs")
+
+class MaintenanceAlert(Base):
+    __tablename__ = "maintenance_alerts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(String, ForeignKey("vehicles.vehicle_id"), nullable=False)
+    alert_type = Column(String, nullable=False)
+    severity = Column(FlexibleEnum(AlertSeverity), default=AlertSeverity.MEDIUM, nullable=False)
+    message = Column(String, nullable=False)
+    is_resolved = Column(Boolean, default=False)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    vehicle = relationship("Vehicle", back_populates="maintenance_alerts")
+
+class Driver(Base):
+    __tablename__ = "drivers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    driver_code = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    license_number = Column(String, unique=True, nullable=False)
+    license_type = Column(String, default="CDL-A")
+    license_expiry = Column(DateTime, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    status = Column(FlexibleEnum(DriverStatus), default=DriverStatus.AVAILABLE, nullable=False)
+    current_vehicle_id = Column(String, ForeignKey("vehicles.vehicle_id"), nullable=True)
+    rating = Column(Float, default=4.9)
+    total_trips = Column(Integer, default=0)
+    total_hours_driven = Column(Float, default=0.0)
+    safety_score = Column(Float, default=98.0)
+    last_assigned_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    current_vehicle = relationship("Vehicle", back_populates="drivers")
+    assignment_history = relationship("DriverAssignmentHistory", back_populates="driver", cascade="all, delete-orphan")
+
+class DriverAssignmentHistory(Base):
+    __tablename__ = "driver_assignment_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=False)
+    vehicle_id = Column(String, ForeignKey("vehicles.vehicle_id"), nullable=False)
+    assigned_at = Column(DateTime, default=datetime.utcnow)
+    unassigned_at = Column(DateTime, nullable=True)
+    assigned_by = Column(String, default="Fleet Manager")
+    notes = Column(String, nullable=True)
+
+    driver = relationship("Driver", back_populates="assignment_history")
+
+class FuelLog(Base):
+    __tablename__ = "fuel_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(String, ForeignKey("vehicles.vehicle_id"), nullable=False)
+    trip_id = Column(Integer, ForeignKey("trips.id"), nullable=True)
+    liters_filled = Column(Float, nullable=False)
+    cost_per_liter = Column(Float, nullable=False)
+    total_cost = Column(Float, nullable=False)
+    odometer_reading = Column(Float, default=0.0)
+    fuel_type = Column(String, default="Diesel")
+    fuel_station = Column(String, nullable=True)
+    fuel_efficiency_km_per_l = Column(Float, nullable=True)
+    is_anomaly = Column(Boolean, default=False)
+    anomaly_reason = Column(String, nullable=True)
+    logged_at = Column(DateTime, default=datetime.utcnow)
+
+    vehicle = relationship("Vehicle", back_populates="fuel_logs")
+    trip = relationship("Trip")

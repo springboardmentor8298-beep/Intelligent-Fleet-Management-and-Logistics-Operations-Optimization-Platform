@@ -138,8 +138,8 @@ export default function TripSchedulerModal({ isOpen, onClose, onTripScheduled })
       <div style={darkModalStyles.container}>
         <div style={darkModalStyles.header}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '18px', color: '#f8fafc', fontWeight: '700' }}>Trip Scheduling & Route Optimizer</h2>
-            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#94a3b8' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary, #f8fafc)', fontWeight: '700' }}>Trip Scheduling & Route Optimizer</h2>
+            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary, #94a3b8)' }}>
               Assign fleet vehicle, check cargo load against capacity, and select route profile.
             </p>
           </div>
@@ -259,9 +259,9 @@ export default function TripSchedulerModal({ isOpen, onClose, onTripScheduled })
                     style={{
                       padding: '12px 10px',
                       borderRadius: '8px',
-                      border: isSelected ? '1px solid #38bdf8' : '1px solid #1e293b',
-                      background: isSelected ? 'rgba(56, 189, 248, 0.12)' : '#070a0f',
-                      color: isSelected ? '#38bdf8' : '#cbd5e1',
+                      border: isSelected ? '1px solid #38bdf8' : '1px solid var(--border-subtle, #1e293b)',
+                      background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'var(--bg-card-sub, #070a0f)',
+                      color: isSelected ? '#38bdf8' : 'var(--text-secondary, #cbd5e1)',
                       cursor: 'pointer',
                       textAlign: 'center',
                       transition: 'all 0.15s'
@@ -285,9 +285,9 @@ export default function TripSchedulerModal({ isOpen, onClose, onTripScheduled })
               </span>
             </div>
 
-            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #1e293b', borderRadius: '8px', padding: '8px', background: '#070a0f' }}>
+            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border-subtle, #1e293b)', borderRadius: '8px', padding: '8px', background: 'var(--bg-card-sub, #070a0f)' }}>
               {shipments.length === 0 ? (
-                <p style={{ margin: 0, padding: '12px', fontSize: '13px', color: '#64748b', textAlign: 'center' }}>No unassigned consignments available.</p>
+                <p style={{ margin: 0, padding: '12px', fontSize: '13px', color: 'var(--text-muted, #64748b)', textAlign: 'center' }}>No unassigned consignments available.</p>
               ) : (
                 shipments.map(s => {
                   const isChecked = selectedShipmentIds.includes(s.id);
@@ -310,11 +310,11 @@ export default function TripSchedulerModal({ isOpen, onClose, onTripScheduled })
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <input type="checkbox" checked={isChecked} onChange={() => {}} />
                         <div>
-                          <b style={{ fontSize: '13px', color: '#f8fafc', fontFamily: 'JetBrains Mono' }}>{s.tracking_number}</b>
-                          <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: '8px' }}>{s.origin} → {s.destination}</span>
+                          <b style={{ fontSize: '13px', color: 'var(--text-primary, #f8fafc)', fontFamily: 'JetBrains Mono' }}>{s.tracking_number}</b>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginLeft: '8px' }}>{s.origin} → {s.destination}</span>
                         </div>
                       </div>
-                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#cbd5e1', fontFamily: 'JetBrains Mono' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary, #cbd5e1)', fontFamily: 'JetBrains Mono' }}>
                         {s.weight_kg || 100} kg
                       </span>
                     </div>
@@ -329,23 +329,23 @@ export default function TripSchedulerModal({ isOpen, onClose, onTripScheduled })
             <div style={darkModalStyles.previewCard}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', textAlign: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Road Distance</div>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc', fontFamily: 'JetBrains Mono' }}>{preview.total_distance_km} km</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Road Distance</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary, #f8fafc)', fontFamily: 'JetBrains Mono' }}>{preview.total_distance_km} km</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Est. Travel Time</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Est. Travel Time</div>
                   <div style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', fontFamily: 'JetBrains Mono' }}>{preview.estimated_duration_mins} min</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Fuel Required</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Fuel Required</div>
                   <div style={{ fontSize: '16px', fontWeight: '800', color: '#34d399', fontFamily: 'JetBrains Mono' }}>{preview.estimated_fuel_liters} L</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase' }}>Arrival ETA</div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#f8fafc', marginTop: '2px' }}>{preview.eta_formatted}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Arrival ETA</div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)', marginTop: '2px' }}>{preview.eta_formatted}</div>
                 </div>
               </div>
-              <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>
+              <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', textAlign: 'center' }}>
                 ℹ️ {preview.profile_description}
               </p>
             </div>
@@ -384,15 +384,15 @@ export default function TripSchedulerModal({ isOpen, onClose, onTripScheduled })
 }
 
 const darkModalStyles = {
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(5, 7, 10, 0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
-  container: { background: '#0d131f', border: '1px solid #1e293b', borderRadius: '16px', width: '90%', maxWidth: '660px', maxHeight: '90vh', overflowY: 'auto', padding: '26px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #1e293b', paddingBottom: '14px', marginBottom: '18px' },
-  closeBtn: { background: 'none', border: 'none', fontSize: '18px', color: '#94a3b8', cursor: 'pointer' },
-  label: { display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748b', marginBottom: '6px', textTransform: 'uppercase' },
-  select: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #1e293b', fontSize: '13px', outline: 'none', background: '#070a0f', color: '#f8fafc' },
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'var(--modal-overlay, rgba(5, 7, 10, 0.75))', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
+  container: { background: 'var(--bg-card, #0d131f)', border: '1px solid var(--border-subtle, #1e293b)', borderRadius: '16px', width: '90%', maxWidth: '660px', maxHeight: '90vh', overflowY: 'auto', padding: '26px', boxShadow: 'var(--shadow-card)' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-subtle, #1e293b)', paddingBottom: '14px', marginBottom: '18px' },
+  closeBtn: { background: 'none', border: 'none', fontSize: '18px', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer' },
+  label: { display: 'block', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted, #64748b)', marginBottom: '6px', textTransform: 'uppercase' },
+  select: { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle, #1e293b)', fontSize: '13px', outline: 'none', background: 'var(--bg-card-sub, #070a0f)', color: 'var(--text-primary, #f8fafc)' },
   alertBox: { background: 'rgba(248, 113, 113, 0.1)', border: '1px solid rgba(248, 113, 113, 0.3)', color: '#f87171', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px' },
-  previewCard: { background: '#070a0f', border: '1px solid #1e293b', borderRadius: '10px', padding: '14px' },
-  previewBtn: { background: '#162030', color: '#38bdf8', border: '1px solid #1e3a5f', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' },
-  cancelBtn: { background: 'transparent', color: '#94a3b8', border: '1px solid #1e293b', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
+  previewCard: { background: 'var(--bg-card-sub, #070a0f)', border: '1px solid var(--border-subtle, #1e293b)', borderRadius: '10px', padding: '14px' },
+  previewBtn: { background: 'var(--bg-card-hover, #162030)', color: '#38bdf8', border: '1px solid var(--border-subtle, #1e3a5f)', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' },
+  cancelBtn: { background: 'transparent', color: 'var(--text-secondary, #94a3b8)', border: '1px solid var(--border-subtle, #1e293b)', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' },
   submitBtn: { background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '12px', fontWeight: '800' }
 };

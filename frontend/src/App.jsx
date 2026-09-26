@@ -9,8 +9,10 @@ import RoutesPage from './pages/RoutesPage';
 import DriversPage from './pages/DriversPage';
 import MaintenancePage from './pages/MaintenancePage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import { ThemeProvider, useTheme } from './utils/ThemeContext';
 
-export default function App() {
+function MainApp() {
+  const { theme } = useTheme();
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
@@ -33,7 +35,7 @@ export default function App() {
 
   if (checkingAuth) {
     return (
-      <div style={{ minHeight: '100vh', background: '#05070a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary, #05070a)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
         ⚡ Initializing FleetFlow Console...
       </div>
     );
@@ -45,7 +47,14 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div style={{ minHeight: '100vh', backgroundColor: '#05070a', color: '#f8fafc' }}>
+      <div
+        className={`theme-container ${theme === 'light' ? 'theme-light' : 'theme-dark'}`}
+        style={{
+          minHeight: '100vh',
+          backgroundColor: 'var(--bg-primary, #05070a)',
+          color: 'var(--text-primary, #f8fafc)'
+        }}
+      >
         <Navbar user={user} onLogout={handleLogout} />
         <main>
           <Routes>
@@ -61,5 +70,13 @@ export default function App() {
         </main>
       </div>
     </BrowserRouter>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <MainApp />
+    </ThemeProvider>
   );
 }

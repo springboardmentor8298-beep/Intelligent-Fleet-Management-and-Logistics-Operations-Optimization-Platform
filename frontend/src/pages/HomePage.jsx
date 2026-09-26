@@ -239,8 +239,8 @@ const homeStyles = {
     gap: '32px'
   },
   heroCard: {
-    background: 'linear-gradient(135deg, #0e1626 0%, #111a2e 100%)',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-hero, linear-gradient(135deg, #0e1626 0%, #111a2e 100%))',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '16px',
     padding: '36px',
     display: 'flex',
@@ -248,7 +248,7 @@ const homeStyles = {
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: '24px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+    boxShadow: 'var(--shadow-hero)'
   },
   tagline: {
     fontSize: '11px',
@@ -261,13 +261,13 @@ const homeStyles = {
     margin: 0,
     fontSize: '28px',
     fontWeight: '800',
-    color: '#f8fafc',
+    color: 'var(--text-primary, #f8fafc)',
     letterSpacing: '-0.5px'
   },
   heroDesc: {
     margin: '10px 0 0 0',
     fontSize: '14px',
-    color: '#94a3b8',
+    color: 'var(--text-secondary, #94a3b8)',
     maxWidth: '650px',
     lineHeight: '1.6'
   },
@@ -277,7 +277,7 @@ const homeStyles = {
   },
   primaryActionBtn: {
     background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
-    color: '#06080d',
+    color: '#ffffff',
     border: 'none',
     padding: '12px 22px',
     borderRadius: '8px',
@@ -287,9 +287,9 @@ const homeStyles = {
     boxShadow: '0 0 15px rgba(56, 189, 248, 0.4)'
   },
   secondaryActionBtn: {
-    background: '#162235',
-    color: '#f8fafc',
-    border: '1px solid #334155',
+    background: 'var(--bg-card-hover, #162235)',
+    color: 'var(--text-primary, #f8fafc)',
+    border: '1px solid var(--border-subtle, #334155)',
     padding: '12px 22px',
     borderRadius: '8px',
     fontSize: '13px',
@@ -302,23 +302,23 @@ const homeStyles = {
     gap: '16px'
   },
   metricCard: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '20px',
     borderRadius: '12px',
-    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.3)'
+    boxShadow: 'var(--shadow-card)'
   },
   metricLabel: {
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase',
     letterSpacing: '0.5px'
   },
   metricValue: {
     fontSize: '32px',
     fontWeight: '800',
-    color: '#f8fafc',
+    color: 'var(--text-primary, #f8fafc)',
     marginTop: '6px',
     fontFamily: 'JetBrains Mono'
   },
@@ -329,12 +329,12 @@ const homeStyles = {
     margin: 0,
     fontSize: '20px',
     fontWeight: '800',
-    color: '#f8fafc'
+    color: 'var(--text-primary, #f8fafc)'
   },
   sectionSub: {
     margin: '4px 0 0 0',
     fontSize: '13px',
-    color: '#94a3b8'
+    color: 'var(--text-secondary, #94a3b8)'
   },
   modulesGrid: {
     display: 'grid',
@@ -342,8 +342,8 @@ const homeStyles = {
     gap: '20px'
   },
   moduleCard: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '14px',
     padding: '24px',
     cursor: 'pointer',
@@ -351,7 +351,7 @@ const homeStyles = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)'
+    boxShadow: 'var(--shadow-card)'
   },
   moduleIcon: {
     width: '44px',
@@ -366,19 +366,20 @@ const homeStyles = {
     margin: '0 0 8px 0',
     fontSize: '16px',
     fontWeight: '700',
-    color: '#f8fafc'
+    color: 'var(--text-primary, #f8fafc)'
   },
   moduleDesc: {
     margin: 0,
     fontSize: '13px',
-    color: '#94a3b8',
+    color: 'var(--text-secondary, #94a3b8)',
     lineHeight: '1.5'
   },
   recentSection: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '16px',
-    padding: '24px'
+    padding: '24px',
+    boxShadow: 'var(--shadow-card)'
   },
   viewAllBtn: {
     background: 'none',
@@ -394,21 +395,22 @@ const homeStyles = {
     textAlign: 'left'
   },
   thRow: {
-    borderBottom: '1px solid #1e293b'
+    background: 'var(--bg-table-header, #090d15)',
+    borderBottom: '1px solid var(--border-subtle, #1e293b)'
   },
   th: {
     padding: '12px 14px',
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase'
   },
   tr: {
-    borderBottom: '1px solid #131b2b'
+    borderBottom: '1px solid var(--border-subtle, #131b2b)'
   },
   td: {
     padding: '14px',
     fontSize: '13px',
-    color: '#cbd5e1'
+    color: 'var(--text-secondary, #cbd5e1)'
   }
 };

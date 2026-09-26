@@ -147,7 +147,7 @@ export default function FleetPage({ user }) {
                 const badge = getStatusStyle(v.status);
                 return (
                   <tr key={v.id} style={fleetStyles.tr}>
-                    <td style={{ ...fleetStyles.td, fontWeight: '700', color: '#f8fafc', fontFamily: 'JetBrains Mono' }}>
+                    <td style={{ ...fleetStyles.td, fontWeight: '700', color: 'var(--text-primary, #f8fafc)', fontFamily: 'JetBrains Mono' }}>
                       🚛 {v.vehicle_id}
                     </td>
                     <td style={{ ...fleetStyles.td, color: '#38bdf8', fontFamily: 'JetBrains Mono' }}>
@@ -217,12 +217,12 @@ const fleetStyles = {
     margin: 0,
     fontSize: '26px',
     fontWeight: '800',
-    color: '#f8fafc'
+    color: 'var(--text-primary, #f8fafc)'
   },
   desc: {
     margin: '6px 0 0 0',
     fontSize: '13px',
-    color: '#94a3b8'
+    color: 'var(--text-secondary, #94a3b8)'
   },
   addBtn: {
     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -241,21 +241,22 @@ const fleetStyles = {
     gap: '14px'
   },
   metricBox: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '16px',
-    borderRadius: '12px'
+    borderRadius: '12px',
+    boxShadow: 'var(--shadow-card)'
   },
   metricLabel: {
     fontSize: '11px',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     fontWeight: '700',
     textTransform: 'uppercase'
   },
   metricNum: {
     fontSize: '26px',
     fontWeight: '800',
-    color: '#f8fafc',
+    color: 'var(--text-primary, #f8fafc)',
     marginTop: '4px',
     fontFamily: 'JetBrains Mono'
   },
@@ -265,42 +266,43 @@ const fleetStyles = {
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: '12px',
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '14px',
-    borderRadius: '12px'
+    borderRadius: '12px',
+    boxShadow: 'var(--shadow-card)'
   },
   searchInput: {
     width: '100%',
     padding: '10px 14px',
     borderRadius: '8px',
-    border: '1px solid #1e293b',
-    background: '#070a0f',
-    color: '#f8fafc',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    background: 'var(--bg-card-sub, #070a0f)',
+    color: 'var(--text-primary, #f8fafc)',
     fontSize: '13px',
     outline: 'none'
   },
   filterPill: {
     padding: '8px 14px',
     borderRadius: '8px',
-    border: '1px solid #1e293b',
-    background: '#070a0f',
-    color: '#94a3b8',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    background: 'var(--bg-card-sub, #070a0f)',
+    color: 'var(--text-secondary, #94a3b8)',
     fontSize: '12px',
     fontWeight: '600',
     cursor: 'pointer'
   },
   activePill: {
-    background: '#1e293b',
+    background: 'var(--bg-card-hover, #1e293b)',
     color: '#38bdf8',
     border: '1px solid #38bdf8'
   },
   tableCard: {
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     borderRadius: '14px',
     overflow: 'hidden',
-    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)'
+    boxShadow: 'var(--shadow-card)'
   },
   table: {
     width: '100%',
@@ -308,22 +310,22 @@ const fleetStyles = {
     textAlign: 'left'
   },
   thRow: {
-    background: '#090d15',
-    borderBottom: '1px solid #1e293b'
+    background: 'var(--bg-table-header, #090d15)',
+    borderBottom: '1px solid var(--border-subtle, #1e293b)'
   },
   th: {
     padding: '14px 16px',
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase'
   },
   tr: {
-    borderBottom: '1px solid #131b2b'
+    borderBottom: '1px solid var(--border-subtle, #131b2b)'
   },
   td: {
     padding: '16px',
     fontSize: '13px',
-    color: '#cbd5e1'
+    color: 'var(--text-secondary, #cbd5e1)'
   }
 };

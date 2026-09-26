@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { loginUser, registerUser } from '../api';
+import { useTheme } from '../utils/ThemeContext';
 
 export default function Login({ onAuthSuccess }) {
+  const { theme, toggleTheme } = useTheme();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,6 +30,33 @@ export default function Login({ onAuthSuccess }) {
 
   return (
     <div style={darkLoginStyles.container}>
+      {/* Theme Switcher Button */}
+      <button
+        onClick={toggleTheme}
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
+          color: theme === 'dark' ? '#f8fafc' : '#0f172a',
+          border: '1px solid rgba(148, 163, 184, 0.3)',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '12px',
+          fontWeight: '700',
+          cursor: 'pointer',
+          zIndex: 100,
+          backdropFilter: 'blur(8px)'
+        }}
+        title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        <span>{theme === 'dark' ? '☀️' : '🌙'}</span>
+        <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+      </button>
+
       {/* Background ambient glow */}
       <div style={darkLoginStyles.ambientGlow} />
 
@@ -106,7 +135,7 @@ const darkLoginStyles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#05070a',
+    backgroundColor: 'var(--bg-primary, #05070a)',
     position: 'relative',
     overflow: 'hidden',
     padding: '24px'
@@ -125,11 +154,11 @@ const darkLoginStyles = {
   card: {
     width: '100%',
     maxWidth: '420px',
-    background: '#0d131f',
-    border: '1px solid #1e293b',
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
     padding: '40px',
     borderRadius: '16px',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+    boxShadow: 'var(--shadow-card)',
     position: 'relative',
     zIndex: 10
   },
@@ -154,7 +183,7 @@ const darkLoginStyles = {
     margin: 0,
     fontSize: '20px',
     fontWeight: '800',
-    color: '#f8fafc',
+    color: 'var(--text-primary, #f8fafc)',
     letterSpacing: '1.5px'
   },
   brandSub: {
@@ -168,13 +197,13 @@ const darkLoginStyles = {
     margin: '0 0 6px 0',
     fontSize: '18px',
     fontWeight: '700',
-    color: '#f8fafc',
+    color: 'var(--text-primary, #f8fafc)',
     textAlign: 'center'
   },
   subtitle: {
     margin: '0 0 20px 0',
     fontSize: '13px',
-    color: '#94a3b8',
+    color: 'var(--text-secondary, #94a3b8)',
     textAlign: 'center'
   },
   label: {
@@ -182,16 +211,16 @@ const darkLoginStyles = {
     marginBottom: '6px',
     fontSize: '11px',
     fontWeight: '700',
-    color: '#64748b',
+    color: 'var(--text-muted, #64748b)',
     textTransform: 'uppercase'
   },
   input: {
     width: '100%',
     padding: '12px 14px',
     borderRadius: '8px',
-    border: '1px solid #1e293b',
-    background: '#070a0f',
-    color: '#f8fafc',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    background: 'var(--bg-card-sub, #070a0f)',
+    color: 'var(--text-primary, #f8fafc)',
     fontSize: '14px',
     outline: 'none',
     boxSizing: 'border-box',
@@ -201,7 +230,7 @@ const darkLoginStyles = {
     width: '100%',
     padding: '13px',
     background: 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)',
-    color: '#06080d',
+    color: '#ffffff',
     fontSize: '14px',
     fontWeight: '800',
     border: 'none',
