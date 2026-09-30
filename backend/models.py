@@ -52,3 +52,19 @@ class Shipment(Base):
     current_location = Column(String, default="Not Started")
 
     eta = Column(String, default="Not Calculated")
+class Maintenance(Base):
+    __tablename__ = "maintenance"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    vehicle_number = Column(String, nullable=False)
+
+    maintenance_type = Column(String, nullable=False)
+
+    maintenance_date = Column(String, nullable=False)
+
+    cost = Column(Float, default=0)
+
+    status = Column(String, default="Scheduled")
+
+    description = Column(String, nullable=True)

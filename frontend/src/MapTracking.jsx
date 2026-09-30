@@ -13,7 +13,6 @@ import L from "leaflet";
 
 import "leaflet/dist/leaflet.css";
 
-
 // ==================================================
 // FIX LEAFLET MARKER ICON
 // ==================================================
@@ -23,14 +22,11 @@ delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-
   iconUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-
   shadowUrl:
     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
-
 
 // ==================================================
 // DEFAULT MAP LOCATION
@@ -38,557 +34,444 @@ L.Icon.Default.mergeOptions({
 
 const defaultPosition = [17.6868, 83.2185];
 
-
 // ==================================================
 // LOCATION COORDINATES
 // ==================================================
 
 const locationCoordinates = {
-
-  // North Andhra
-
   Srikakulam: [18.2949, 83.8938],
-
   Vizianagaram: [18.1067, 83.3956],
-
   Visakhapatnam: [17.6868, 83.2185],
-
   Anakapalle: [17.6913, 83.0037],
-
   Araku: [18.3273, 82.8775],
 
-  // East Godavari
-
-  Rajahmundry: [17.0005, 81.8040],
-
+  Rajahmundry: [17.0005, 81.804],
   Kakinada: [16.9891, 82.2475],
-
   Amalapuram: [16.5787, 82.0061],
-
-  Tuni: [17.3590, 82.5460],
-
+  Tuni: [17.359, 82.546],
   Pithapuram: [17.1168, 82.2528],
-
-  Samalkota: [17.0560, 82.2436],
-
+  Samalkota: [17.056, 82.2436],
   Rampachodavaram: [17.4409, 81.7756],
 
-  // West Godavari
-
   Eluru: [16.7107, 81.0952],
-
   Bhimavaram: [16.5449, 81.5212],
-
   Tadepalligudem: [16.8147, 81.5275],
+  Narsapur: [16.434, 81.698],
+  Tanuku: [16.755, 81.681],
 
-  Narsapur: [16.4340, 81.6980],
-
-  Tanuku: [16.7550, 81.6810],
-
-  // Krishna
-
-  Vijayawada: [16.5062, 80.6480],
-
+  Vijayawada: [16.5062, 80.648],
   Machilipatnam: [16.1875, 81.1389],
-
-  Gudivada: [16.4355, 80.9920],
-
-  Nuzvid: [16.7880, 80.8450],
-
-  // Guntur
+  Gudivada: [16.4355, 80.992],
+  Nuzvid: [16.788, 80.845],
 
   Guntur: [16.3067, 80.4365],
-
-  Tenali: [16.2430, 80.6400],
-
-  Narasaraopet: [16.2350, 80.0490],
-
-  // Prakasam
+  Tenali: [16.243, 80.640],
+  Narasaraopet: [16.235, 80.049],
 
   Ongole: [15.5057, 80.0499],
-
   Chirala: [15.8246, 80.3521],
-
-  Markapur: [15.7350, 79.2680],
-
-  // Nellore
+  Markapur: [15.735, 79.268],
 
   Nellore: [14.4426, 79.9865],
-
   Kavali: [14.9163, 79.9947],
-
-  Gudur: [14.1500, 79.8500],
-
-  // Rayalaseema
+  Gudur: [14.15, 79.85],
 
   Tirupati: [13.6288, 79.4192],
-
   Chittoor: [13.2172, 79.1003],
-
   Kadapa: [14.4673, 78.8242],
-
   Kurnool: [15.8281, 78.0373],
-
   Anantapur: [14.6819, 77.6006],
-
   Hindupur: [13.8281, 77.4914],
 
-  // Other major cities
-
   Amaravati: [16.5745, 80.3575],
-
-  Rajampet: [14.1950, 79.1600],
-
+  Rajampet: [14.195, 79.160],
 };
-
 
 // ==================================================
 // MOVE MAP TO LOCATION
 // ==================================================
 
 function MoveToLocation({ position }) {
-
   const map = useMap();
 
   useEffect(() => {
-
     if (position) {
-
       map.setView(position, 10);
-
     }
-
   }, [position, map]);
 
   return null;
 }
-
 
 // ==================================================
 // MAIN COMPONENT
 // ==================================================
 
 function MapTracking() {
+  const [vehicleNumber, setVehicleNumber] = useState("");
 
-  // Vehicle number
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-  const [vehicleNumber, setVehicleNumber] =
-    useState("");
+  const [startingLocation, setStartingLocation] = useState(null);
 
+  const [currentLocation, setCurrentLocation] = useState(null);
 
-  // Selected vehicle
+  const [vehicles, setVehicles] = useState([]);
 
-  const [selectedVehicle, setSelectedVehicle] =
-    useState(null);
+  const [shipments, setShipments] = useState([]);
 
+  const [loading, setLoading] = useState(false);
 
-  // Starting location
+  const [error, setError] = useState("");
 
-  const [startingLocation, setStartingLocation] =
-    useState(null);
+  const [message, setMessage] = useState("");
 
+  // ==================================================
+  // FETCH VEHICLES
+  // ==================================================
 
-  // Current location
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/vehicles"
+      );
 
-  const [currentLocation, setCurrentLocation] =
-    useState(null);
+      if (!response.ok) {
+        throw new Error("Failed to fetch vehicles");
+      }
 
+      const data = await response.json();
 
-  // Shipments
+      if (Array.isArray(data)) {
+        setVehicles(data);
+      } else {
+        setVehicles([]);
+      }
+    } catch (err) {
+      console.error("Vehicle fetch error:", err);
+      setVehicles([]);
+    }
+  };
 
-  const [shipments, setShipments] =
-    useState([]);
-
-
-  // Loading
-
-  const [loading, setLoading] =
-    useState(false);
-
-
-  // Error
-
-  const [error, setError] =
-    useState("");
-
-
-  // Success message
-
-  const [message, setMessage] =
-    useState("");
-
-
-// ==================================================
-// FETCH SHIPMENTS
-// ==================================================
+  // ==================================================
+  // FETCH SHIPMENTS
+  // ==================================================
 
   const fetchShipments = async () => {
-
     try {
-
       const response = await fetch(
         "http://127.0.0.1:8000/shipments"
       );
 
-
       if (!response.ok) {
-
-        throw new Error(
-          "Failed to fetch shipments"
-        );
-
+        throw new Error("Failed to fetch shipments");
       }
 
-
-      const data =
-        await response.json();
-
-
-      console.log(
-        "Shipments:",
-        data
-      );
-
+      const data = await response.json();
 
       if (Array.isArray(data)) {
-
         setShipments(data);
-
-      }
-
-      else if (
-        Array.isArray(data.shipments)
-      ) {
-
-        setShipments(
-          data.shipments
-        );
-
-      }
-
-      else {
-
+      } else if (Array.isArray(data.shipments)) {
+        setShipments(data.shipments);
+      } else {
         setShipments([]);
-
       }
-
-
-    }
-
-    catch (err) {
-
-      console.error(
-        "Shipment fetch error:",
-        err
-      );
-
+    } catch (err) {
+      console.error("Shipment fetch error:", err);
       setShipments([]);
-
     }
-
   };
 
-
-// ==================================================
-// LOAD SHIPMENTS
-// ==================================================
+  // ==================================================
+  // LOAD DATA
+  // ==================================================
 
   useEffect(() => {
-
+    fetchVehicles();
     fetchShipments();
 
+    const interval = setInterval(() => {
+      fetchVehicles();
+      fetchShipments();
+    }, 5000);
 
-    const interval =
-      setInterval(
-        fetchShipments,
-        5000
-      );
-
-
-    return () =>
-      clearInterval(interval);
-
+    return () => clearInterval(interval);
   }, []);
 
+  // ==================================================
+  // FIND LOCATION COORDINATES
+  // ==================================================
 
-// ==================================================
-// FIND VEHICLE
-// ==================================================
-
-  const trackVehicle = () => {
-
-    setError("");
-
-    setMessage("");
-
-    setSelectedVehicle(null);
-
-    setStartingLocation(null);
-
-    setCurrentLocation(null);
-
-
-    const enteredNumber =
-      vehicleNumber
-        .trim()
-        .toUpperCase();
-
-
-    // Empty input
-
-    if (!enteredNumber) {
-
-      setError(
-        "Please enter a vehicle number."
-      );
-
-      return;
-
+  const getCoordinates = (locationName) => {
+    if (!locationName) {
+      return null;
     }
 
+    const cleanName = String(locationName).trim();
+
+    if (locationCoordinates[cleanName]) {
+      return locationCoordinates[cleanName];
+    }
+
+    const matchedKey = Object.keys(locationCoordinates).find(
+      (key) =>
+        key.toLowerCase() === cleanName.toLowerCase()
+    );
+
+    if (matchedKey) {
+      return locationCoordinates[matchedKey];
+    }
+
+    return null;
+  };
+
+  // ==================================================
+  // FIND VEHICLE
+  // ==================================================
+
+  const trackVehicle = () => {
+    setError("");
+    setMessage("");
+    setSelectedVehicle(null);
+    setStartingLocation(null);
+    setCurrentLocation(null);
+
+    const enteredNumber = vehicleNumber
+      .trim()
+      .toUpperCase();
+
+    if (!enteredNumber) {
+      setError("Please enter a vehicle number.");
+      return;
+    }
 
     setLoading(true);
 
+    // ==================================================
+    // SEARCH IN VEHICLES
+    // ==================================================
 
-// ==================================================
-// FIND VEHICLE FROM SHIPMENTS
-// ==================================================
+    const vehicle = vehicles.find((item) => {
+      const number = String(
+        item.vehicle_number || ""
+      )
+        .trim()
+        .toUpperCase();
 
-    const vehicleShipment =
-      shipments.find(
-        (shipment) => {
+      return number === enteredNumber;
+    });
 
-          const number =
-            String(
-              shipment.vehicle_number || ""
-            )
-              .trim()
-              .toUpperCase();
+    // ==================================================
+    // VEHICLE NOT FOUND
+    // ==================================================
 
-
-          return number ===
-            enteredNumber;
-
-        }
-      );
-
-
-    // Vehicle not found
-
-    if (!vehicleShipment) {
-
+    if (!vehicle) {
       setError(
         `Vehicle ${enteredNumber} was not found.`
       );
 
       setLoading(false);
-
       return;
-
     }
 
+    // ==================================================
+    // SEARCH SHIPMENT FOR THIS VEHICLE
+    // ==================================================
 
-// ==================================================
-// GET STARTING LOCATION
-// ==================================================
+    const vehicleShipment = shipments.find(
+      (shipment) => {
+        const number = String(
+          shipment.vehicle_number || ""
+        )
+          .trim()
+          .toUpperCase();
 
-    const startName =
-      vehicleShipment.starting_location ||
-      vehicleShipment.start_location ||
-      vehicleShipment.source ||
-      vehicleShipment.origin ||
-      vehicleShipment.startingLocation;
-
-
-// ==================================================
-// GET CURRENT LOCATION
-// ==================================================
-
-    const currentName =
-      vehicleShipment.current_location ||
-      vehicleShipment.currentLocation ||
-      vehicleShipment.destination ||
-      vehicleShipment.location;
-
-
-// ==================================================
-// CHECK START LOCATION
-// ==================================================
-
-    if (!startName) {
-
-      setError(
-        "Starting location is not available for this vehicle."
-      );
-
-      setLoading(false);
-
-      return;
-
-    }
-
-
-// ==================================================
-// CHECK CURRENT LOCATION
-// ==================================================
-
-    if (!currentName) {
-
-      setError(
-        "Current location is not available for this vehicle."
-      );
-
-      setLoading(false);
-
-      return;
-
-    }
-
-
-// ==================================================
-// FIND START COORDINATES
-// ==================================================
-
-    const startCoordinates =
-      locationCoordinates[
-        startName
-      ];
-
-
-// ==================================================
-// FIND CURRENT COORDINATES
-// ==================================================
-
-    const currentCoordinates =
-      locationCoordinates[
-        currentName
-      ];
-
-
-// ==================================================
-// START LOCATION NOT FOUND
-// ==================================================
-
-    if (!startCoordinates) {
-
-      setError(
-        `Starting location "${startName}" does not have map coordinates.`
-      );
-
-      setLoading(false);
-
-      return;
-
-    }
-
-
-// ==================================================
-// CURRENT LOCATION NOT FOUND
-// ==================================================
-
-    if (!currentCoordinates) {
-
-      setError(
-        `Current location "${currentName}" does not have map coordinates.`
-      );
-
-      setLoading(false);
-
-      return;
-
-    }
-
-
-// ==================================================
-// SAVE VEHICLE DATA
-// ==================================================
-
-    setSelectedVehicle(
-      vehicleShipment
+        return number === enteredNumber;
+      }
     );
 
+    // ==================================================
+    // STARTING LOCATION
+    // ==================================================
+
+    let startName = null;
+
+    if (vehicleShipment) {
+      startName =
+        vehicleShipment.starting_location ||
+        vehicleShipment.start_location ||
+        vehicleShipment.source ||
+        vehicleShipment.origin ||
+        vehicleShipment.startingLocation;
+    }
+
+    // If shipment doesn't have starting location,
+    // use vehicle location.
+
+    if (!startName) {
+      startName = vehicle.location;
+    }
+
+    // ==================================================
+    // CURRENT LOCATION
+    // ==================================================
+
+    let currentName = null;
+
+    if (vehicleShipment) {
+      currentName =
+        vehicleShipment.current_location ||
+        vehicleShipment.currentLocation ||
+        vehicleShipment.location;
+    }
+
+    // ==================================================
+    // VEHICLE GPS LOCATION
+    // ==================================================
+
+    let gpsCoordinates = null;
+
+    if (
+      vehicle.latitude !== null &&
+      vehicle.latitude !== undefined &&
+      vehicle.longitude !== null &&
+      vehicle.longitude !== undefined
+    ) {
+      gpsCoordinates = [
+        Number(vehicle.latitude),
+        Number(vehicle.longitude),
+      ];
+    }
+
+    // ==================================================
+    // CURRENT LOCATION
+    // ==================================================
+
+    if (!currentName) {
+      currentName = vehicle.location;
+    }
+
+    // ==================================================
+    // START COORDINATES
+    // ==================================================
+
+    let startCoordinates = getCoordinates(startName);
+
+    // ==================================================
+    // CURRENT COORDINATES
+    // ==================================================
+
+    let currentCoordinates = gpsCoordinates;
+
+    if (!currentCoordinates && currentName) {
+      currentCoordinates =
+        getCoordinates(currentName);
+    }
+
+    // ==================================================
+    // IF GPS IS NOT AVAILABLE
+    // ==================================================
+
+    if (!currentCoordinates && startCoordinates) {
+      currentCoordinates = startCoordinates;
+    }
+
+    // ==================================================
+    // NO START LOCATION
+    // ==================================================
+
+    if (!startName) {
+      setError(
+        "Location is not available for this vehicle."
+      );
+
+      setLoading(false);
+      return;
+    }
+
+    // ==================================================
+    // NO COORDINATES
+    // ==================================================
+
+    if (!startCoordinates && !currentCoordinates) {
+      setError(
+        `Location "${startName}" does not have map coordinates.`
+      );
+
+      setLoading(false);
+      return;
+    }
+
+    // ==================================================
+    // IF ONLY CURRENT GPS EXISTS
+    // ==================================================
+
+    if (!startCoordinates && currentCoordinates) {
+      startCoordinates = currentCoordinates;
+    }
+
+    // ==================================================
+    // SAVE VEHICLE
+    // ==================================================
+
+    setSelectedVehicle(vehicle);
 
     setStartingLocation({
-
       name: startName,
-
-      coordinates:
-        startCoordinates,
-
+      coordinates: startCoordinates,
     });
-
 
     setCurrentLocation({
-
-      name: currentName,
-
-      coordinates:
-        currentCoordinates,
-
+      name: currentName || "Current GPS Location",
+      coordinates: currentCoordinates,
     });
 
+    // ==================================================
+    // SUCCESS MESSAGE
+    // ==================================================
 
     setMessage(
       `Vehicle ${enteredNumber} found successfully.`
     );
 
-
     setLoading(false);
-
   };
 
-
-// ==================================================
-// ENTER KEY
-// ==================================================
+  // ==================================================
+  // ENTER KEY
+  // ==================================================
 
   const handleKeyDown = (event) => {
-
     if (event.key === "Enter") {
-
       trackVehicle();
-
     }
-
   };
 
-
-// ==================================================
-// CLEAR
-// ==================================================
+  // ==================================================
+  // CLEAR
+  // ==================================================
 
   const clearTracking = () => {
-
     setVehicleNumber("");
-
     setSelectedVehicle(null);
-
     setStartingLocation(null);
-
     setCurrentLocation(null);
-
     setError("");
-
     setMessage("");
-
   };
 
-
-// ==================================================
-// MAP CENTER
-// ==================================================
+  // ==================================================
+  // MAP CENTER
+  // ==================================================
 
   const mapCenter =
-    currentLocation
-      ? currentLocation.coordinates
-      : startingLocation
-      ? startingLocation.coordinates
-      : defaultPosition;
+    currentLocation?.coordinates ||
+    startingLocation?.coordinates ||
+    defaultPosition;
 
-
-// ==================================================
-// ROUTE LINE
-// ==================================================
+  // ==================================================
+  // ROUTE
+  // ==================================================
 
   const routePositions =
     startingLocation &&
@@ -599,24 +482,19 @@ function MapTracking() {
         ]
       : [];
 
-
-// ==================================================
-// UI
-// ==================================================
+  // ==================================================
+  // UI
+  // ==================================================
 
   return (
-
     <div
       style={{
         width: "100%",
-        minHeight:
-          "calc(100vh - 120px)",
+        minHeight: "calc(100vh - 120px)",
         padding: "25px",
         boxSizing: "border-box",
       }}
     >
-
-
       {/* ==================================================
           TITLE
       ================================================== */}
@@ -631,7 +509,6 @@ function MapTracking() {
             "0 4px 15px rgba(0,0,0,0.08)",
         }}
       >
-
         <h1
           style={{
             margin: 0,
@@ -641,7 +518,6 @@ function MapTracking() {
         >
           📍 Live Tracking
         </h1>
-
 
         <p
           style={{
@@ -653,9 +529,7 @@ function MapTracking() {
         >
           Track the starting and current location of any vehicle
         </p>
-
       </div>
-
 
       {/* ==================================================
           SEARCH VEHICLE
@@ -671,7 +545,6 @@ function MapTracking() {
             "0 4px 15px rgba(0,0,0,0.08)",
         }}
       >
-
         <h2
           style={{
             marginTop: 0,
@@ -681,7 +554,6 @@ function MapTracking() {
           🚚 Track Vehicle
         </h2>
 
-
         <div
           style={{
             display: "flex",
@@ -690,15 +562,12 @@ function MapTracking() {
             alignItems: "center",
           }}
         >
-
           <input
             type="text"
             placeholder="Enter vehicle number e.g. AP39AB1234"
             value={vehicleNumber}
             onChange={(e) =>
-              setVehicleNumber(
-                e.target.value
-              )
+              setVehicleNumber(e.target.value)
             }
             onKeyDown={handleKeyDown}
             style={{
@@ -714,15 +583,12 @@ function MapTracking() {
             }}
           />
 
-
           <button
             onClick={trackVehicle}
             disabled={loading}
             style={{
-              padding:
-                "14px 25px",
-              background:
-                "#2563eb",
+              padding: "14px 25px",
+              background: "#2563eb",
               color: "white",
               border: "none",
               borderRadius: "8px",
@@ -733,21 +599,16 @@ function MapTracking() {
                 : "pointer",
             }}
           >
-
             {loading
               ? "Tracking..."
               : "📍 Track Vehicle"}
-
           </button>
-
 
           <button
             onClick={clearTracking}
             style={{
-              padding:
-                "14px 22px",
-              background:
-                "#64748b",
+              padding: "14px 22px",
+              background: "#64748b",
               color: "white",
               border: "none",
               borderRadius: "8px",
@@ -756,13 +617,9 @@ function MapTracking() {
               cursor: "pointer",
             }}
           >
-
             Clear
-
           </button>
-
         </div>
-
 
         {/* ==================================================
             EXAMPLES
@@ -775,82 +632,59 @@ function MapTracking() {
             fontSize: "14px",
           }}
         >
-
           Try:
           {" "}
-
-          <strong>AP39AB1234</strong>,
-          {" "}
-
-          <strong>AP39CD4567</strong>,
-          {" "}
-
-          <strong>AP39EF7890</strong>,
-          {" "}
-
-          <strong>AP39GH1122</strong>
-
+          <strong>AP39AB1234</strong>,{" "}
+          <strong>AP39CD4567</strong>,{" "}
+          <strong>AP39EF7890</strong>,{" "}
+          <strong>AP39GH1122</strong>,{" "}
+          <strong>AP39IJ3344</strong>,{" "}
+          <strong>AP39KL5566</strong>,{" "}
+          <strong>AP39MN7788</strong>
         </p>
-
 
         {/* ==================================================
             SUCCESS
         ================================================== */}
 
         {message && (
-
           <div
             style={{
               marginTop: "15px",
               padding: "12px",
-              background:
-                "#dcfce7",
-              color:
-                "#166534",
+              background: "#dcfce7",
+              color: "#166534",
               borderRadius: "8px",
             }}
           >
-
             ✅ {message}
-
           </div>
-
         )}
-
 
         {/* ==================================================
             ERROR
         ================================================== */}
 
         {error && (
-
           <div
             style={{
               marginTop: "15px",
               padding: "12px",
-              background:
-                "#fee2e2",
-              color:
-                "#b91c1c",
+              background: "#fee2e2",
+              color: "#b91c1c",
               borderRadius: "8px",
             }}
           >
-
             ❌ {error}
-
           </div>
-
         )}
-
       </div>
-
 
       {/* ==================================================
           VEHICLE INFORMATION
       ================================================== */}
 
       {selectedVehicle && (
-
         <div
           style={{
             background: "#ffffff",
@@ -861,7 +695,6 @@ function MapTracking() {
               "0 4px 15px rgba(0,0,0,0.08)",
           }}
         >
-
           <h2
             style={{
               marginTop: 0,
@@ -871,7 +704,6 @@ function MapTracking() {
             🚚 Vehicle Information
           </h2>
 
-
           <div
             style={{
               display: "grid",
@@ -880,125 +712,84 @@ function MapTracking() {
               gap: "15px",
             }}
           >
-
-
-            {/* VEHICLE */}
-
             <div
               style={{
                 padding: "15px",
-                background:
-                  "#f8fafc",
+                background: "#f8fafc",
                 borderRadius: "8px",
               }}
             >
-
-              <strong>
-                Vehicle Number
-              </strong>
-
+              <strong>Vehicle Number</strong>
               <br />
-
               {selectedVehicle.vehicle_number}
-
             </div>
-
-
-            {/* DRIVER */}
 
             <div
               style={{
                 padding: "15px",
-                background:
-                  "#f8fafc",
+                background: "#f8fafc",
                 borderRadius: "8px",
               }}
             >
-
-              <strong>
-                Driver
-              </strong>
-
+              <strong>Driver</strong>
               <br />
-
               {selectedVehicle.driver_name ||
-                selectedVehicle.driver ||
                 "Not Assigned"}
-
             </div>
-
-
-            {/* STATUS */}
 
             <div
               style={{
                 padding: "15px",
-                background:
-                  "#f8fafc",
+                background: "#f8fafc",
                 borderRadius: "8px",
               }}
             >
-
-              <strong>
-                Status
-              </strong>
-
+              <strong>Status</strong>
               <br />
-
               {selectedVehicle.status}
-
             </div>
-
-
-            {/* START */}
 
             <div
               style={{
                 padding: "15px",
-                background:
-                  "#eff6ff",
+                background: "#eff6ff",
                 borderRadius: "8px",
               }}
             >
-
-              <strong>
-                🟢 Starting Location
-              </strong>
-
+              <strong>🟢 Starting Location</strong>
               <br />
-
               {startingLocation?.name}
-
             </div>
-
-
-            {/* CURRENT */}
 
             <div
               style={{
                 padding: "15px",
-                background:
-                  "#fff7ed",
+                background: "#fff7ed",
                 borderRadius: "8px",
               }}
             >
-
-              <strong>
-                🔴 Current Location
-              </strong>
-
+              <strong>🔴 Current Location</strong>
               <br />
-
               {currentLocation?.name}
-
             </div>
 
+            <div
+              style={{
+                padding: "15px",
+                background: "#f0fdf4",
+                borderRadius: "8px",
+              }}
+            >
+              <strong>📡 GPS</strong>
+              <br />
+              {selectedVehicle.latitude !== null &&
+              selectedVehicle.longitude !== null
+                ? "Available"
+                : "Not updated yet"}
+            </div>
           </div>
-
         </div>
-
       )}
-
 
       {/* ==================================================
           MAP
@@ -1013,7 +804,6 @@ function MapTracking() {
             "0 4px 15px rgba(0,0,0,0.08)",
         }}
       >
-
         <h2
           style={{
             marginTop: 0,
@@ -1023,74 +813,59 @@ function MapTracking() {
           🗺️ Vehicle Route Map
         </h2>
 
-
         {/* ==================================================
             LOCATION SUMMARY
         ================================================== */}
 
         {startingLocation &&
           currentLocation && (
-
-          <div
-            style={{
-              display: "flex",
-              gap: "15px",
-              flexWrap: "wrap",
-              marginBottom: "15px",
-            }}
-          >
-
             <div
               style={{
-                flex: 1,
-                minWidth: "220px",
-                padding: "15px",
-                background:
-                  "#eff6ff",
-                borderRadius: "8px",
-                border:
-                  "1px solid #bfdbfe",
+                display: "flex",
+                gap: "15px",
+                flexWrap: "wrap",
+                marginBottom: "15px",
               }}
             >
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: "220px",
+                  padding: "15px",
+                  background: "#eff6ff",
+                  borderRadius: "8px",
+                  border:
+                    "1px solid #bfdbfe",
+                }}
+              >
+                🟢{" "}
+                <strong>
+                  Starting Location
+                </strong>
+                <br />
+                {startingLocation.name}
+              </div>
 
-              🟢 <strong>
-                Starting Location
-              </strong>
-
-              <br />
-
-              {startingLocation.name}
-
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: "220px",
+                  padding: "15px",
+                  background: "#fff7ed",
+                  borderRadius: "8px",
+                  border:
+                    "1px solid #fed7aa",
+                }}
+              >
+                🔴{" "}
+                <strong>
+                  Current Location
+                </strong>
+                <br />
+                {currentLocation.name}
+              </div>
             </div>
-
-
-            <div
-              style={{
-                flex: 1,
-                minWidth: "220px",
-                padding: "15px",
-                background:
-                  "#fff7ed",
-                borderRadius: "8px",
-                border:
-                  "1px solid #fed7aa",
-              }}
-            >
-
-              🔴 <strong>
-                Current Location
-              </strong>
-
-              <br />
-
-              {currentLocation.name}
-
-            </div>
-
-          </div>
-
-        )}
-
+          )}
 
         <MapContainer
           center={mapCenter}
@@ -1102,12 +877,10 @@ function MapTracking() {
             overflow: "hidden",
           }}
         >
-
           <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
+            attribution="&copy; OpenStreetMap contributors"
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-
 
           {/* ==================================================
               MOVE MAP
@@ -1115,7 +888,6 @@ function MapTracking() {
 
           {(currentLocation ||
             startingLocation) && (
-
             <MoveToLocation
               position={
                 currentLocation
@@ -1123,30 +895,24 @@ function MapTracking() {
                   : startingLocation.coordinates
               }
             />
-
           )}
 
-
           {/* ==================================================
-              STARTING LOCATION MARKER
+              START MARKER
           ================================================== */}
 
           {startingLocation && (
-
             <Marker
               position={
                 startingLocation.coordinates
               }
             >
-
               <Popup>
-
                 <div
                   style={{
                     minWidth: "200px",
                   }}
                 >
-
                   <h3
                     style={{
                       marginTop: 0,
@@ -1156,79 +922,62 @@ function MapTracking() {
                     🟢 Starting Location
                   </h3>
 
-
                   <strong>
                     Vehicle:
                   </strong>
-
                   <br />
-
                   {selectedVehicle?.vehicle_number}
 
                   <br />
                   <br />
 
-
                   <strong>
                     Location:
                   </strong>
-
                   <br />
-
                   {startingLocation.name}
 
                   <br />
                   <br />
 
-
                   <strong>
                     Latitude:
                   </strong>
+                  <br />
+                  {startingLocation.coordinates[0].toFixed(
+                    6
+                  )}
 
                   <br />
-
-                  {startingLocation.coordinates[0].toFixed(6)}
-
-                  <br />
-
 
                   <strong>
                     Longitude:
                   </strong>
-
                   <br />
-
-                  {startingLocation.coordinates[1].toFixed(6)}
-
+                  {startingLocation.coordinates[1].toFixed(
+                    6
+                  )}
                 </div>
-
               </Popup>
-
             </Marker>
-
           )}
 
-
           {/* ==================================================
-              CURRENT LOCATION MARKER
+              CURRENT MARKER
           ================================================== */}
 
           {currentLocation && (
-
             <Marker
               position={
                 currentLocation.coordinates
               }
             >
-
               <Popup>
-
                 <div
                   style={{
                     minWidth: "200px",
                   }}
                 >
-
                   <h3
                     style={{
                       marginTop: 0,
@@ -1238,79 +987,74 @@ function MapTracking() {
                     🔴 Current Location
                   </h3>
 
-
                   <strong>
                     Vehicle:
                   </strong>
-
                   <br />
-
                   {selectedVehicle?.vehicle_number}
 
                   <br />
                   <br />
 
-
                   <strong>
                     Driver:
                   </strong>
-
                   <br />
-
                   {selectedVehicle?.driver_name ||
-                    selectedVehicle?.driver ||
                     "Not Assigned"}
 
                   <br />
                   <br />
 
-
                   <strong>
                     Location:
                   </strong>
-
                   <br />
-
                   {currentLocation.name}
 
                   <br />
                   <br />
 
-
                   <strong>
                     Latitude:
                   </strong>
+                  <br />
+                  {currentLocation.coordinates[0].toFixed(
+                    6
+                  )}
 
                   <br />
-
-                  {currentLocation.coordinates[0].toFixed(6)}
-
-                  <br />
-
 
                   <strong>
                     Longitude:
                   </strong>
-
                   <br />
+                  {currentLocation.coordinates[1].toFixed(
+                    6
+                  )}
 
-                  {currentLocation.coordinates[1].toFixed(6)}
+                  {selectedVehicle?.last_location_update && (
+                    <>
+                      <br />
+                      <br />
 
+                      <strong>
+                        Last Updated:
+                      </strong>
+                      <br />
+                      {selectedVehicle.last_location_update}
+                    </>
+                  )}
                 </div>
-
               </Popup>
-
             </Marker>
-
           )}
-
 
           {/* ==================================================
               ROUTE LINE
           ================================================== */}
 
           {routePositions.length === 2 && (
-
             <Polyline
               positions={routePositions}
               pathOptions={{
@@ -1319,18 +1063,11 @@ function MapTracking() {
                 opacity: 0.7,
               }}
             />
-
           )}
-
         </MapContainer>
-
       </div>
-
     </div>
-
   );
-
 }
-
 
 export default MapTracking;

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, engine, Base
-from models import Vehicle, Shipment
+from models import Vehicle, Shipment, Maintenance
 
 
 # ============================================================
@@ -39,6 +39,10 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5175",
+        "http://localhost:5176",
+        "http://127.0.0.1:5176",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -88,6 +92,19 @@ class ShipmentCreate(BaseModel):
     status: str = "Pending"
     current_location: str = "Not Started"
     eta: str = "Not Calculated"
+
+
+# ============================================================
+# MILESTONE 3 - MAINTENANCE MODEL
+# ============================================================
+
+class MaintenanceCreate(BaseModel):
+    vehicle_number: str
+    maintenance_type: str
+    maintenance_date: datetime
+    cost: float = 0
+    status: str = "Scheduled"
+    description: str = ""
 
 
 # ============================================================
@@ -472,13 +489,8 @@ def optimize_route(
     source = source.strip()
     destination = destination.strip()
 
-    # --------------------------------------------------------
-    # ROUTE DATA
-    # --------------------------------------------------------
-
     routes = {
 
-        # Srikakulam -> Visakhapatnam
         ("Srikakulam", "Visakhapatnam"): {
             "route": [
                 "Srikakulam",
@@ -492,7 +504,6 @@ def optimize_route(
             "estimated_time": "3 hours"
         },
 
-        # Visakhapatnam -> Srikakulam
         ("Visakhapatnam", "Srikakulam"): {
             "route": [
                 "Visakhapatnam",
@@ -506,7 +517,6 @@ def optimize_route(
             "estimated_time": "3 hours"
         },
 
-        # Srikakulam -> Rajahmundry
         ("Srikakulam", "Rajahmundry"): {
             "route": [
                 "Srikakulam",
@@ -521,7 +531,6 @@ def optimize_route(
             "estimated_time": "5 hours 30 minutes"
         },
 
-        # Rajahmundry -> Srikakulam
         ("Rajahmundry", "Srikakulam"): {
             "route": [
                 "Rajahmundry",
@@ -536,7 +545,6 @@ def optimize_route(
             "estimated_time": "5 hours 30 minutes"
         },
 
-        # Visakhapatnam -> Rajahmundry
         ("Visakhapatnam", "Rajahmundry"): {
             "route": [
                 "Visakhapatnam",
@@ -549,7 +557,6 @@ def optimize_route(
             "estimated_time": "4 hours"
         },
 
-        # Rajahmundry -> Visakhapatnam
         ("Rajahmundry", "Visakhapatnam"): {
             "route": [
                 "Rajahmundry",
@@ -562,7 +569,6 @@ def optimize_route(
             "estimated_time": "4 hours"
         },
 
-        # Kakinada -> Visakhapatnam
         ("Kakinada", "Visakhapatnam"): {
             "route": [
                 "Kakinada",
@@ -575,7 +581,6 @@ def optimize_route(
             "estimated_time": "3 hours 30 minutes"
         },
 
-        # Visakhapatnam -> Kakinada
         ("Visakhapatnam", "Kakinada"): {
             "route": [
                 "Visakhapatnam",
@@ -588,7 +593,6 @@ def optimize_route(
             "estimated_time": "3 hours 30 minutes"
         },
 
-        # Kakinada -> Rajahmundry
         ("Kakinada", "Rajahmundry"): {
             "route": [
                 "Kakinada",
@@ -600,7 +604,6 @@ def optimize_route(
             "estimated_time": "1 hour 30 minutes"
         },
 
-        # Rajahmundry -> Kakinada
         ("Rajahmundry", "Kakinada"): {
             "route": [
                 "Rajahmundry",
@@ -612,11 +615,6 @@ def optimize_route(
             "estimated_time": "1 hour 30 minutes"
         }
     }
-
-
-    # --------------------------------------------------------
-    # FIND ROUTE
-    # --------------------------------------------------------
 
     key = (source, destination)
 
@@ -633,11 +631,6 @@ def optimize_route(
             "message": "Optimized route calculated successfully"
         }
 
-
-    # --------------------------------------------------------
-    # DEFAULT ROUTE
-    # --------------------------------------------------------
-
     return {
         "source": source,
         "destination": destination,
@@ -649,14 +642,15 @@ def optimize_route(
         "estimated_time": "Not available",
         "message": "Basic route generated"
     }
-# ==========================================================
+
+
+# ============================================================
 # TRAFFIC-AWARE ROUTE PLANNING
-# ==========================================================
+# ============================================================
 
 @app.get("/traffic-route")
 def traffic_route(source: str, destination: str):
 
-    # Sample route data
     routes = {
         ("Srikakulam", "Visakhapatnam"): [
             {
@@ -712,14 +706,12 @@ def traffic_route(source: str, destination: str):
 
     available_routes = routes[key]
 
-    # Calculate traffic-adjusted time
     for route in available_routes:
         route["traffic_time"] = round(
             route["normal_time"] * route["traffic_factor"],
             2
         )
 
-    # Select route with lowest traffic-adjusted time
     best_route = min(
         available_routes,
         key=lambda route: route["traffic_time"]
@@ -731,3 +723,39 @@ def traffic_route(source: str, destination: str):
         "routes": available_routes,
         "recommended_route": best_route
     }
+
+
+# ============================================================
+# MILESTONE 3 - MAINTENANCE APIs
+# ============================================================
+
+@app.post("/maintenance")
+def add_maintenance(
+    maintenance_data: MaintenanceCreate,
+    db: Session = Depends(get_db)
+):
+
+    maintenance = Maintenance(
+        vehicle_number=maintenance_data.vehicle_number,
+        maintenance_type=maintenance_data.maintenance_type,
+        maintenance_date=maintenance_data.maintenance_date,
+        cost=maintenance_data.cost,
+        status=maintenance_data.status,
+        description=maintenance_data.description
+    )
+
+    db.add(maintenance)
+    db.commit()
+    db.refresh(maintenance)
+
+    return maintenance
+
+
+@app.get("/maintenance")
+def get_maintenance(
+    db: Session = Depends(get_db)
+):
+
+    maintenance_records = db.query(Maintenance).all()
+
+    return maintenance_records
