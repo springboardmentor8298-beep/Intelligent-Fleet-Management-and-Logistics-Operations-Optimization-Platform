@@ -50,6 +50,10 @@ def sync_data():
                 vals_str = ", ".join(val_strs)
                 sql_statements.append(f"INSERT INTO {t} ({col_names_str}) VALUES ({vals_str});")
 
+    # Update auto-increment sequences to MAX(id)
+    for t in tables:
+        sql_statements.append(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), coalesce(max(id), 1)) FROM {t};")
+
     sql_statements.append("COMMIT;")
     full_sql = "\n".join(sql_statements)
 
