@@ -25,11 +25,20 @@ export default function AnalyticsPage({ user }) {
 
   useEffect(() => {
     loadAnalytics();
+    const interval = setInterval(() => {
+      loadAnalytics(true);
+    }, 6000);
+    const handleFocus = () => loadAnalytics(true);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
-  const loadAnalytics = async () => {
+  const loadAnalytics = async (isSilent = false) => {
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const [ovRes, utRes, pfRes, flRes] = await Promise.all([
         fetchOperationalOverview(),
         fetchFleetUtilization(),
@@ -42,9 +51,9 @@ export default function AnalyticsPage({ user }) {
       setFuel(flRes.data);
     } catch (err) {
       console.error('Error fetching operational analytics:', err);
-      showToast('Could not load live analytics from server.', true);
+      if (!isSilent) showToast('Could not load live analytics from server.', true);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -118,6 +127,9 @@ export default function AnalyticsPage({ user }) {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => loadAnalytics(false)} disabled={loading} style={analyticsStyles.refreshBtn}>
+            🔄 {loading ? 'Refreshing...' : 'Refresh Live Data'}
+          </button>
           <button onClick={handleTriggerCeleryReport} disabled={runningCelery} style={analyticsStyles.celeryBtn}>
             {runningCelery ? '⏳ Dispathing...' : '⚡ Trigger Celery Report'}
           </button>
@@ -359,6 +371,7 @@ const analyticsStyles = {
   subtitle: { fontSize: '11px', fontWeight: '800', color: '#c084fc', letterSpacing: '1px', marginBottom: '4px' },
   title: { margin: 0, fontSize: '26px', fontWeight: '800', color: 'var(--text-primary, #f8fafc)' },
   desc: { margin: '6px 0 0 0', fontSize: '13px', color: 'var(--text-secondary, #94a3b8)' },
+  refreshBtn: { background: 'var(--bg-card-hover, #1e293b)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' },
   exportPdfBtn: { background: 'var(--bg-card-hover, #162030)', color: '#38bdf8', border: '1px solid var(--border-subtle, rgba(56, 189, 248, 0.4))', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' },
   exportExcelBtn: { background: 'var(--bg-card-hover, #162030)', color: '#34d399', border: '1px solid var(--border-subtle, rgba(52, 211, 153, 0.4))', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' },
   celeryBtn: { background: 'var(--bg-card-hover, #1e293b)', color: '#fbbf24', border: '1px solid #f59e0b', padding: '10px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: '800', cursor: 'pointer' },

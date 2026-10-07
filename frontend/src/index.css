@@ -364,3 +364,47 @@ a {
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
+
+/* ========================================================
+   MILESTONE 4: UI RESPONSIVENESS & SYSTEM OPTIMIZATION
+   ======================================================== */
+@media (max-width: 1024px) {
+  .dashboard-grid, .kpi-container, .analytics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid, .kpi-container, .analytics-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .navbar-container {
+    flex-direction: column !important;
+    gap: 12px !important;
+    padding: 10px 16px !important;
+  }
+  .nav-links-wrapper {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 4px !important;
+  }
+  .table-responsive, table {
+    display: block !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+  }
+  .modal-container {
+    width: 95% !important;
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 13px !important;
+  }
+  .hero-header h1 {
+    font-size: 20px !important;
+  }
+}

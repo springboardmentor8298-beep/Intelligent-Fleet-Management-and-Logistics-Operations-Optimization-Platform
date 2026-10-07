@@ -3,7 +3,8 @@ from typing import Optional, List, Any, Dict
 from datetime import datetime
 from app.models import (
     UserRole, VehicleStatus, ShipmentStatus, TripStatus, RouteOptimizationType,
-    MaintenanceStatus, MaintenancePriority, DriverStatus, AlertSeverity
+    MaintenanceStatus, MaintenancePriority, DriverStatus, AlertSeverity,
+    NotificationType, NotificationChannel
 )
 
 # --- User Schemas ---
@@ -19,6 +20,32 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UserProfileUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    role: Optional[UserRole] = None
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+class AccountSettingsResponse(BaseModel):
+    email: str
+    role: str
+    notifications_enabled: bool = True
+    sms_alerts_enabled: bool = True
+    email_digests_enabled: bool = True
+    theme_preference: str = "dark"
+    language: str = "en"
+    timezone: str = "UTC"
+
+class AccountSettingsUpdate(BaseModel):
+    notifications_enabled: Optional[bool] = None
+    sms_alerts_enabled: Optional[bool] = None
+    email_digests_enabled: Optional[bool] = None
+    theme_preference: Optional[str] = None
+    language: Optional[str] = None
+    timezone: Optional[str] = None
 
 class Token(BaseModel):
     access_token: str
@@ -330,6 +357,8 @@ class OperationalOverviewResponse(BaseModel):
     on_time_delivery_rate: float
     total_shipments_delivered: int
     total_distance_km: float
+    base_operations_distance_km: Optional[float] = None
+    gps_logged_distance_km: Optional[float] = 0.0
     total_fuel_consumed_liters: float
     total_maintenance_spend: float
     active_maintenance_alerts: int
@@ -346,3 +375,43 @@ class FleetPerformanceResponse(BaseModel):
     incident_delay_rate: float
     top_performing_drivers: List[Dict[str, Any]]
     highest_maintenance_vehicles: List[Dict[str, Any]]
+
+# --- Milestone 4: Notification Module Schemas ---
+class NotificationCreate(BaseModel):
+    notification_type: NotificationType
+    channel: Optional[NotificationChannel] = NotificationChannel.IN_APP
+    recipient: str
+    title: str
+    message: str
+    reference_id: Optional[str] = None
+
+class NotificationResponse(BaseModel):
+    id: int
+    notification_type: NotificationType
+    channel: NotificationChannel
+    recipient: str
+    title: str
+    message: str
+    reference_id: Optional[str] = None
+    status: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class NotificationDispatchResult(BaseModel):
+    notification_id: int
+    channel: str
+    recipient: str
+    status: str
+    dispatch_timestamp: datetime
+    details: Optional[str] = None
+
+# --- Milestone 4: Reports & Export Module Schemas ---
+class ReportExportRequest(BaseModel):
+    report_type: str  # fleet_utilization, fuel_consumption, driver_performance, delivery_performance, maintenance
+    format: str = "pdf"  # pdf, csv, excel, json
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    filters: Optional[Dict[str, Any]] = None

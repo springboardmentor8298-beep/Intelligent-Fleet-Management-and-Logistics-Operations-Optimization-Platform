@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchShipments, createShipment, getTrackingSocketUrl, optimizeRoute, geocodeLocation } from '../api';
+import { fetchShipments, createShipment, getTrackingSocketUrl, optimizeRoute, geocodeLocation, fetchShipmentGpsLogs, clearShipmentGpsLogs } from '../api';
 import LiveTrackingMap from '../components/LiveTrackingMap';
 import TripSchedulerModal from '../components/TripSchedulerModal';
 import ShipmentHistoryModal from '../components/ShipmentHistoryModal';
+
+export const getHeadingCompass = (deg) => {
+  if (deg === undefined || deg === null) return 'N';
+  const val = Math.floor((deg / 22.5) + 0.5);
+  const arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  return arr[(val % 16)];
+};
+
 
 // Comprehensive Global Geocoding Directory (US, Europe, Asia, India, Sri Lanka)
 export const GLOBAL_LOCATIONS = {
@@ -116,6 +124,12 @@ export default function ShipmentsPage() {
   const [isLiveStreaming, setIsLiveStreaming] = useState(false);
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  // Real-time GPS Telemetry Log System State
+  const [gpsLogs, setGpsLogs] = useState([]);
+  const [gpsLogFilter, setGpsLogFilter] = useState('ALL');
+  const [autoScrollLogs, setAutoScrollLogs] = useState(true);
+  const logContainerRef = useRef(null);
+
   // Modals
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   const [historyShipmentId, setHistoryShipmentId] = useState(null);
@@ -144,6 +158,13 @@ export default function ShipmentsPage() {
     };
   }, []);
 
+  // Auto-scroll GPS log console to top whenever new live pings arrive
+  useEffect(() => {
+    if (autoScrollLogs && logContainerRef.current) {
+      logContainerRef.current.scrollTop = 0;
+    }
+  }, [gpsLogs, autoScrollLogs]);
+
   const loadShipments = async () => {
     try {
       const res = await fetchShipments();
@@ -157,9 +178,37 @@ export default function ShipmentsPage() {
     }
   };
 
+  const loadHistoricalLogs = async (tn) => {
+    if (!tn) return;
+    try {
+      const res = await fetchShipmentGpsLogs(tn, 150);
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setGpsLogs(res.data.map((b, idx) => ({
+          id: `db-${b.id || idx}`,
+          seq: res.data.length - idx,
+          timestamp: b.recorded_at ? new Date(b.recorded_at).toLocaleTimeString() : '--:--:--',
+          isoTime: b.recorded_at,
+          lat: Number(b.latitude),
+          lng: Number(b.longitude),
+          speed: b.speed_kmh || 0,
+          heading: b.heading_deg || 0,
+          vehicle_id: b.vehicle_id || 'Active Fleet',
+          status: b.speed_kmh > 0 ? 'In Transit' : 'Stationary',
+          isHistorical: true
+        })));
+      } else {
+        setGpsLogs([]);
+      }
+    } catch (e) {
+      setGpsLogs([]);
+    }
+  };
+
   const selectShipmentForMap = async (shipment) => {
     setActiveTrackingNumber(shipment.tracking_number);
     setActiveShipment(shipment);
+    loadHistoricalLogs(shipment.tracking_number);
+
     const startLat = shipment.current_lat || shipment.origin_lat || 13.0827;
     const startLng = shipment.current_lng || shipment.origin_lng || 80.2707;
     const destLat = shipment.destination_lat || 6.9271;
@@ -222,6 +271,38 @@ export default function ShipmentsPage() {
           delay_reason: parsed.delay_reason
         });
 
+        // Add live GPS telemetry ping to real-time GPS log system
+        const newLogPing = {
+          id: `live-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          seq: parsed.step_idx || (gpsLogs.length + 1),
+          total_steps: parsed.total_steps,
+          timestamp: new Date().toLocaleTimeString(),
+          isoTime: parsed.timestamp || new Date().toISOString(),
+          lat: parsed.lat,
+          lng: parsed.lng,
+          speed: parsed.speed_kmh,
+          heading: parsed.heading || 0,
+          remaining_km: parsed.remaining_km,
+          eta: parsed.eta_display,
+          status: parsed.status,
+          vehicle_id: parsed.vehicle_id || target?.vehicle_id || activeShipment?.vehicle_id || 'Active Fleet',
+          is_delayed: parsed.is_delayed,
+          delay_reason: parsed.delay_reason,
+          isLive: true
+        };
+        setGpsLogs(prev => [newLogPing, ...prev.slice(0, 199)]);
+
+        // Keep registry state synchronized with live vehicle location and status
+        setShipments(prev => prev.map(s => s.tracking_number === parsed.tracking_number ? {
+          ...s,
+          current_lat: parsed.lat,
+          current_lng: parsed.lng,
+          speed_kmh: parsed.speed_kmh,
+          eta: parsed.eta_display,
+          status: parsed.status,
+          vehicle_id: parsed.vehicle_id || s.vehicle_id
+        } : s));
+
         if (parsed.status === 'Delivered') {
           // Immediately update consignment in registry list
           setShipments(prev => prev.map(s => s.tracking_number === parsed.tracking_number ? {
@@ -258,6 +339,50 @@ export default function ShipmentsPage() {
       startLiveTracking(trackingNumber);
     }
   };
+
+  const exportGpsLogsToCsv = () => {
+    if (!gpsLogs || gpsLogs.length === 0) return;
+    const headers = ["Seq", "Timestamp", "Latitude", "Longitude", "Velocity_kmh", "Heading_deg", "Remaining_km", "ETA", "Status", "Vehicle_ID"];
+    const rows = gpsLogs.map(l => [
+      l.seq || '',
+      `"${l.timestamp || l.isoTime || ''}"`,
+      l.lat,
+      l.lng,
+      l.speed,
+      l.heading,
+      l.remaining_km !== undefined ? l.remaining_km : '',
+      `"${l.eta || ''}"`,
+      `"${l.status || ''}"`,
+      `"${l.vehicle_id || ''}"`
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${activeTrackingNumber || 'fleet'}_gps_telemetry_logs.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleClearGpsLogs = async () => {
+    if (!activeTrackingNumber) return;
+    try {
+      await clearShipmentGpsLogs(activeTrackingNumber);
+      setGpsLogs([]);
+    } catch (err) {
+      setGpsLogs([]);
+    }
+  };
+
+  const filteredGpsLogs = gpsLogs.filter(log => {
+    if (gpsLogFilter === 'ALL') return true;
+    if (gpsLogFilter === 'CRUISING (>40)') return log.speed > 40;
+    if (gpsLogFilter === 'URBAN (<40)') return log.speed <= 40;
+    if (gpsLogFilter === 'ALERTS') return log.is_delayed || log.speed === 0;
+    return true;
+  });
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
@@ -527,6 +652,248 @@ export default function ShipmentsPage() {
               {isLiveStreaming ? '⏹ Stop Live Satellite Stream' : (telemetry.status === 'Delivered' ? '🔄 Replay Real-Time GPS Tracking' : '▶ Start Real-Time GPS Tracking')}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Real-time Satellite GPS Log System Console */}
+      <div style={shipStyles.gpsLogCard}>
+        {/* GPS Log Header & Controls */}
+        <div style={shipStyles.gpsLogHeader}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              backgroundColor: isLiveStreaming ? '#10b981' : '#64748b',
+              boxShadow: isLiveStreaming ? '0 0 14px #10b981' : 'none'
+            }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: 'var(--text-primary, #f8fafc)', letterSpacing: '0.4px' }}>
+                  🛰️ Live Satellite GPS Telemetry Log System
+                </h3>
+                <span style={{
+                  padding: '3px 9px',
+                  borderRadius: '9999px',
+                  fontSize: '10px',
+                  fontWeight: '800',
+                  background: isLiveStreaming ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.12)',
+                  color: isLiveStreaming ? '#34d399' : '#94a3b8',
+                  border: isLiveStreaming ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(148, 163, 184, 0.2)'
+                }}>
+                  {isLiveStreaming ? '🟢 LIVE TELEMETRY STREAM ACTIVE' : '⚪ STANDBY / READY'}
+                </span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginTop: '3px' }}>
+                Assigned Asset: <b style={{ color: '#38bdf8' }}>{activeShipment?.vehicle_id || 'Auto-Allocated'}</b> | Consignment: <b style={{ color: '#38bdf8', fontFamily: 'JetBrains Mono' }}>{activeTrackingNumber || 'None'}</b>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {/* Filter pills */}
+            <div style={{ display: 'flex', background: 'var(--bg-card-sub, #070a0f)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-subtle, #1e293b)' }}>
+              {['ALL', 'CRUISING (>40)', 'URBAN (<40)', 'ALERTS'].map(f => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setGpsLogFilter(f)}
+                  style={{
+                    background: gpsLogFilter === f ? 'var(--bg-card-hover, #1e293b)' : 'transparent',
+                    color: gpsLogFilter === f ? '#38bdf8' : 'var(--text-muted, #64748b)',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setAutoScrollLogs(!autoScrollLogs)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: '700',
+                background: autoScrollLogs ? 'rgba(56, 189, 248, 0.15)' : 'var(--bg-card-sub, #070a0f)',
+                color: autoScrollLogs ? '#38bdf8' : 'var(--text-muted, #64748b)',
+                border: '1px solid var(--border-subtle, #1e293b)',
+                cursor: 'pointer'
+              }}
+              title="Pin newest logs at the top of the stream"
+            >
+              {autoScrollLogs ? '⚡ Pin Newest: ON' : '⚡ Pin Newest: OFF'}
+            </button>
+
+            <button
+              onClick={exportGpsLogsToCsv}
+              disabled={gpsLogs.length === 0}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: '700',
+                background: 'var(--bg-card-hover, #1e293b)',
+                color: '#34d399',
+                border: '1px solid rgba(52, 211, 153, 0.3)',
+                cursor: gpsLogs.length === 0 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              📥 Export CSV
+            </button>
+
+            <button
+              onClick={handleClearGpsLogs}
+              disabled={gpsLogs.length === 0}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: '700',
+                background: 'var(--bg-card-hover, #1e293b)',
+                color: '#f87171',
+                border: '1px solid rgba(248, 113, 113, 0.3)',
+                cursor: gpsLogs.length === 0 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              🗑️ Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Live GPS Telemetry Status Strip */}
+        <div style={shipStyles.gpsTelemetryStrip}>
+          <div style={shipStyles.gpsStripItem}>
+            <span style={shipStyles.gpsStripLabel}>TOTAL LOGGED PINGS</span>
+            <span style={{ ...shipStyles.gpsStripVal, color: '#38bdf8' }}>{gpsLogs.length} pings</span>
+          </div>
+          <div style={shipStyles.gpsStripItem}>
+            <span style={shipStyles.gpsStripLabel}>LATEST GPS FIX</span>
+            <span style={{ ...shipStyles.gpsStripVal, color: '#f8fafc' }}>
+              {currentCoords?.lat?.toFixed(5) || '--'}, {currentCoords?.lng?.toFixed(5) || '--'}
+            </span>
+          </div>
+          <div style={shipStyles.gpsStripItem}>
+            <span style={shipStyles.gpsStripLabel}>TELEMETRY VELOCITY</span>
+            <span style={{ ...shipStyles.gpsStripVal, color: '#34d399' }}>{telemetry.speed || 0} km/h</span>
+          </div>
+          <div style={shipStyles.gpsStripItem}>
+            <span style={shipStyles.gpsStripLabel}>AZIMUTH / HEADING</span>
+            <span style={{ ...shipStyles.gpsStripVal, color: '#fbbf24' }}>
+              {telemetry.heading ? `${telemetry.heading}° ${getHeadingCompass(telemetry.heading)}` : '0° N'}
+            </span>
+          </div>
+          <div style={shipStyles.gpsStripItem}>
+            <span style={shipStyles.gpsStripLabel}>SATELLITE SYNC</span>
+            <span style={{ ...shipStyles.gpsStripVal, color: isLiveStreaming ? '#10b981' : '#94a3b8' }}>
+              {isLiveStreaming ? '🟢 12 Sats Locked (DGPS)' : '⚪ Synchronized'}
+            </span>
+          </div>
+        </div>
+
+        {/* Real-time Scrollable GPS Table */}
+        <div ref={logContainerRef} style={shipStyles.gpsLogTableWrap}>
+          <table style={shipStyles.gpsTable}>
+            <thead>
+              <tr style={shipStyles.gpsThRow}>
+                <th style={shipStyles.gpsTh}># Seq</th>
+                <th style={shipStyles.gpsTh}>Time (Local)</th>
+                <th style={shipStyles.gpsTh}>GPS Latitude</th>
+                <th style={shipStyles.gpsTh}>GPS Longitude</th>
+                <th style={shipStyles.gpsTh}>Velocity</th>
+                <th style={shipStyles.gpsTh}>Heading</th>
+                <th style={shipStyles.gpsTh}>Remaining</th>
+                <th style={shipStyles.gpsTh}>ETA</th>
+                <th style={shipStyles.gpsTh}>Telemetry Status</th>
+                <th style={{ ...shipStyles.gpsTh, textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredGpsLogs.map((log, index) => {
+                const isFirst = index === 0 && isLiveStreaming;
+                return (
+                  <tr key={log.id || index} style={{
+                    ...shipStyles.gpsTr,
+                    background: isFirst ? 'rgba(56, 189, 248, 0.08)' : 'transparent'
+                  }}>
+                    <td style={{ ...shipStyles.gpsTd, color: isFirst ? '#38bdf8' : '#64748b', fontWeight: '700' }}>
+                      #{log.seq || (gpsLogs.length - index)}
+                    </td>
+                    <td style={{ ...shipStyles.gpsTd, color: '#94a3b8' }}>
+                      {log.timestamp}
+                    </td>
+                    <td style={{ ...shipStyles.gpsTd, color: '#38bdf8', fontWeight: '600' }}>
+                      {Number(log.lat).toFixed(5)}
+                    </td>
+                    <td style={{ ...shipStyles.gpsTd, color: '#38bdf8', fontWeight: '600' }}>
+                      {Number(log.lng).toFixed(5)}
+                    </td>
+                    <td style={shipStyles.gpsTd}>
+                      <span style={{
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        background: log.speed > 50 ? 'rgba(52, 211, 153, 0.15)' : (log.speed > 20 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(251, 191, 36, 0.15)'),
+                        color: log.speed > 50 ? '#34d399' : (log.speed > 20 ? '#38bdf8' : '#fbbf24')
+                      }}>
+                        {log.speed} km/h
+                      </span>
+                    </td>
+                    <td style={{ ...shipStyles.gpsTd, color: '#cbd5e1' }}>
+                      {log.heading || 0}° {getHeadingCompass(log.heading || 0)}
+                    </td>
+                    <td style={{ ...shipStyles.gpsTd, color: '#94a3b8' }}>
+                      {log.remaining_km !== undefined ? `${log.remaining_km} km` : '--'}
+                    </td>
+                    <td style={{ ...shipStyles.gpsTd, color: '#cbd5e1' }}>
+                      {log.eta || '--'}
+                    </td>
+                    <td style={shipStyles.gpsTd}>
+                      <span style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        background: log.status === 'Delivered' ? 'rgba(52, 211, 153, 0.2)' : (log.is_delayed ? 'rgba(248, 113, 113, 0.2)' : 'rgba(56, 189, 248, 0.12)'),
+                        color: log.status === 'Delivered' ? '#34d399' : (log.is_delayed ? '#f87171' : '#38bdf8')
+                      }}>
+                        {log.status || 'Active'}
+                      </span>
+                    </td>
+                    <td style={{ ...shipStyles.gpsTd, textAlign: 'right' }}>
+                      <button
+                        onClick={() => navigator.clipboard?.writeText(`${log.lat},${log.lng}`)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748b',
+                          cursor: 'pointer',
+                          fontSize: '11px'
+                        }}
+                        title="Copy GPS coordinates"
+                      >
+                        📋 Copy
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filteredGpsLogs.length === 0 && (
+                <tr>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#64748b', fontSize: '12px' }}>
+                    📡 No GPS telemetry logs recorded yet for this consignment. Start live tracking to stream satellite pings in real-time.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -908,5 +1275,88 @@ const shipStyles = {
     borderRadius: '6px',
     fontSize: '12px',
     cursor: 'pointer'
+  },
+  gpsLogCard: {
+    background: 'var(--bg-card, #0d131f)',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    borderRadius: '14px',
+    padding: '20px',
+    boxShadow: 'var(--shadow-card, 0 4px 20px rgba(0,0,0,0.3))',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px'
+  },
+  gpsLogHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '12px',
+    paddingBottom: '12px',
+    borderBottom: '1px solid var(--border-subtle, #1e293b)'
+  },
+  gpsTelemetryStrip: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gap: '10px',
+    background: 'var(--bg-card-sub, #070a0f)',
+    padding: '12px 16px',
+    borderRadius: '10px',
+    border: '1px solid var(--border-subtle, #1e293b)'
+  },
+  gpsStripItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px'
+  },
+  gpsStripLabel: {
+    fontSize: '9px',
+    fontWeight: '800',
+    color: 'var(--text-muted, #64748b)',
+    letterSpacing: '0.8px',
+    textTransform: 'uppercase'
+  },
+  gpsStripVal: {
+    fontSize: '13px',
+    fontWeight: '700',
+    fontFamily: 'JetBrains Mono, monospace'
+  },
+  gpsLogTableWrap: {
+    maxHeight: '280px',
+    overflowY: 'auto',
+    borderRadius: '8px',
+    border: '1px solid var(--border-subtle, #1e293b)',
+    background: 'var(--bg-card-sub, #070a0f)'
+  },
+  gpsTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    textAlign: 'left',
+    fontSize: '12px',
+    fontFamily: 'JetBrains Mono, monospace'
+  },
+  gpsThRow: {
+    background: 'var(--bg-card-hover, #162030)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 2,
+    borderBottom: '1px solid var(--border-subtle, #1e293b)'
+  },
+  gpsTh: {
+    padding: '10px 12px',
+    fontSize: '10px',
+    fontWeight: '800',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px'
+  },
+  gpsTr: {
+    borderBottom: '1px solid rgba(30, 41, 59, 0.6)',
+    transition: 'background-color 0.15s ease'
+  },
+  gpsTd: {
+    padding: '8px 12px',
+    fontSize: '11px',
+    whiteSpace: 'nowrap'
   }
 };

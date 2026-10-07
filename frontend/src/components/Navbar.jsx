@@ -111,18 +111,23 @@ export default function Navbar({ user, onLogout }) {
   };
 
   return (
-    <nav style={dynamicStyles.nav}>
+    <nav className="navbar-container" style={dynamicStyles.nav}>
       <div style={staticNavStyles.brandSection}>
         <Link to="/" className="navbar-brand-link" style={staticNavStyles.brandLink}>
           <div style={staticNavStyles.logoIcon}>⚡</div>
           <div>
-            <div className="navbar-brand-title" style={dynamicStyles.brandTitle}>FLEETFLOW</div>
+            <div className="navbar-brand-title" style={dynamicStyles.brandTitle}>
+              FLEETFLOW
+              <span style={{ marginLeft: '6px', fontSize: '9px', padding: '1px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700, verticalAlign: 'middle' }}>
+                M4 PROD
+              </span>
+            </div>
             <div style={dynamicStyles.brandSubtitle}>INTELLIGENT LOGISTICS</div>
           </div>
         </Link>
       </div>
 
-      <div style={staticNavStyles.linksContainer}>
+      <div className="nav-links-wrapper" style={staticNavStyles.linksContainer}>
         {navItems.map((item) => (
           <NavLink
             key={item.to}

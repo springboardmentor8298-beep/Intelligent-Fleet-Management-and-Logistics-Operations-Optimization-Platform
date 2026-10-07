@@ -1,0 +1,146 @@
+# ==============================================================================
+# FleetFlow Logistics Platform - Multi-Container Docker Compose Stack
+# Milestone 4: Dockerization & Orchestration Specification
+# ==============================================================================
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Database Service
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: fleetflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-fleetflow_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - fleetflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fleetflow_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fleetflow-net
+
+  # ----------------------------------------------------------------------------
+  # 2. Redis Message Broker & Cache Service
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: fleetflow-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - fleetflow_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fleetflow-net
+
+  # ----------------------------------------------------------------------------
+  # 3. FastAPI Backend REST API Service
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fleetflow-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fleetflow_db}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-fleetflow_super_secret_jwt_key_2026}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - fleetflow-net
+
+  # ----------------------------------------------------------------------------
+  # 4. Celery Asynchronous Task Worker Service
+  # ----------------------------------------------------------------------------
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fleetflow-celery-worker
+    restart: unless-stopped
+    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "--loglevel=info"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fleetflow_db}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-fleetflow_super_secret_jwt_key_2026}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - fleetflow-net
+
+  # ----------------------------------------------------------------------------
+  # 5. Celery Beat Periodic Task Scheduler Service
+  # ----------------------------------------------------------------------------
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fleetflow-celery-beat
+    restart: unless-stopped
+    command: ["celery", "-A", "app.celery_app.celery_app", "beat", "--loglevel=info"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fleetflow_db}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - fleetflow-net
+
+  # ----------------------------------------------------------------------------
+  # 6. React Vite Production Frontend (Nginx Alpine)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fleetflow-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - fleetflow-net
+
+networks:
+  fleetflow-net:
+    driver: bridge
+    name: fleetflow-network
+
+volumes:
+  fleetflow_pgdata:
+    name: fleetflow_pgdata
+  fleetflow_redisdata:
+    name: fleetflow_redisdata

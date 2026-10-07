@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchShipmentDetail, updateShipmentStatus } from '../api';
+import { fetchShipmentDetail, updateShipmentStatus, fetchShipmentGpsLogs } from '../api';
 
 export default function ShipmentHistoryModal({ shipmentId, isOpen, onClose, onStatusUpdated }) {
   const [detail, setDetail] = useState(null);
@@ -7,6 +7,8 @@ export default function ShipmentHistoryModal({ shipmentId, isOpen, onClose, onSt
   const [newStatus, setNewStatus] = useState('');
   const [note, setNote] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [activeTab, setActiveTab] = useState('events'); // 'events' | 'gps'
+  const [gpsBreadcrumbs, setGpsBreadcrumbs] = useState([]);
 
   useEffect(() => {
     if (isOpen && shipmentId) {
@@ -20,6 +22,14 @@ export default function ShipmentHistoryModal({ shipmentId, isOpen, onClose, onSt
       const res = await fetchShipmentDetail(shipmentId);
       setDetail(res.data);
       setNewStatus(res.data.status);
+      if (res.data?.tracking_number) {
+        try {
+          const gpsRes = await fetchShipmentGpsLogs(res.data.tracking_number, 100);
+          setGpsBreadcrumbs(gpsRes.data || []);
+        } catch (e) {
+          setGpsBreadcrumbs([]);
+        }
+      }
     } catch (err) {
       console.error("Failed to load shipment history", err);
     } finally {
@@ -116,35 +126,112 @@ export default function ShipmentHistoryModal({ shipmentId, isOpen, onClose, onSt
               </button>
             </form>
 
-            {/* Event Timeline */}
-            <div>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-primary, #f8fafc)', fontWeight: '700' }}>Event Sequence</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '220px', overflowY: 'auto' }}>
-                {detail.events && detail.events.length > 0 ? (
-                  detail.events.map((evt, idx) => (
-                    <div key={evt.id || idx} style={{ display: 'flex', gap: '12px' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#38bdf8', marginTop: '4px', flexShrink: 0, boxShadow: '0 0 8px #38bdf8' }} />
-                      <div style={{ flex: 1, paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle, #1e293b)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>{evt.status}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted, #64748b)', fontFamily: 'JetBrains Mono' }}>
-                            {new Date(evt.timestamp).toLocaleString()}
-                          </span>
+            {/* Tabs Navigation */}
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle, #1e293b)', paddingBottom: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setActiveTab('events')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  background: activeTab === 'events' ? 'var(--bg-card-hover, #1e293b)' : 'transparent',
+                  color: activeTab === 'events' ? '#38bdf8' : 'var(--text-muted, #64748b)'
+                }}
+              >
+                📜 Event Sequence ({detail.events?.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('gps')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  background: activeTab === 'gps' ? 'var(--bg-card-hover, #1e293b)' : 'transparent',
+                  color: activeTab === 'gps' ? '#38bdf8' : 'var(--text-muted, #64748b)'
+                }}
+              >
+                🛰️ GPS Breadcrumb Logs ({gpsBreadcrumbs.length})
+              </button>
+            </div>
+
+            {/* Event Timeline View */}
+            {activeTab === 'events' && (
+              <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '240px', overflowY: 'auto' }}>
+                  {detail.events && detail.events.length > 0 ? (
+                    detail.events.map((evt, idx) => (
+                      <div key={evt.id || idx} style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#38bdf8', marginTop: '4px', flexShrink: 0, boxShadow: '0 0 8px #38bdf8' }} />
+                        <div style={{ flex: 1, paddingBottom: '10px', borderBottom: '1px solid var(--border-subtle, #1e293b)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>{evt.status}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted, #64748b)', fontFamily: 'JetBrains Mono' }}>
+                              {new Date(evt.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          {evt.location_desc && (
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginTop: '2px' }}>📍 {evt.location_desc}</div>
+                          )}
+                          {evt.note && (
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)', marginTop: '2px', fontStyle: 'italic' }}>💬 {evt.note}</div>
+                          )}
                         </div>
-                        {evt.location_desc && (
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginTop: '2px' }}>📍 {evt.location_desc}</div>
-                        )}
-                        {evt.note && (
-                          <div style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)', marginTop: '2px', fontStyle: 'italic' }}>💬 {evt.note}</div>
-                        )}
                       </div>
-                    </div>
-                  ))
+                    ))
+                  ) : (
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)', textAlign: 'center', margin: '20px 0' }}>No milestone events logged yet.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* GPS Breadcrumb Logs View */}
+            {activeTab === 'gps' && (
+              <div style={{ maxHeight: '240px', overflowY: 'auto', borderRadius: '8px', border: '1px solid var(--border-subtle, #1e293b)', background: 'var(--bg-card-sub, #070a0f)' }}>
+                {gpsBreadcrumbs.length > 0 ? (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '11px', fontFamily: 'JetBrains Mono' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-card-hover, #162030)', borderBottom: '1px solid var(--border-subtle, #1e293b)', position: 'sticky', top: 0 }}>
+                        <th style={{ padding: '8px 10px', color: '#94a3b8', fontSize: '10px' }}>Time</th>
+                        <th style={{ padding: '8px 10px', color: '#94a3b8', fontSize: '10px' }}>Coordinates</th>
+                        <th style={{ padding: '8px 10px', color: '#94a3b8', fontSize: '10px' }}>Velocity</th>
+                        <th style={{ padding: '8px 10px', color: '#94a3b8', fontSize: '10px' }}>Heading</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gpsBreadcrumbs.map((b, i) => (
+                        <tr key={b.id || i} style={{ borderBottom: '1px solid rgba(30, 41, 59, 0.5)' }}>
+                          <td style={{ padding: '6px 10px', color: '#94a3b8' }}>
+                            {b.recorded_at ? new Date(b.recorded_at).toLocaleTimeString() : '--'}
+                          </td>
+                          <td style={{ padding: '6px 10px', color: '#38bdf8' }}>
+                            {Number(b.latitude).toFixed(4)}, {Number(b.longitude).toFixed(4)}
+                          </td>
+                          <td style={{ padding: '6px 10px', color: '#34d399' }}>
+                            {b.speed_kmh} km/h
+                          </td>
+                          <td style={{ padding: '6px 10px', color: '#cbd5e1' }}>
+                            {b.heading_deg}°
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 ) : (
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)', textAlign: 'center', margin: '20px 0' }}>No milestone events logged yet.</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted, #64748b)', textAlign: 'center', margin: '30px 0' }}>
+                    No recorded GPS breadcrumb pings found for this unit.
+                  </p>
                 )}
               </div>
-            </div>
+            )}
           </div>
         ) : null}
       </div>

@@ -1,4 +1,5 @@
 import sys
+import uuid
 from datetime import datetime, timedelta
 from app.database import SessionLocal, engine, Base
 from app.models import (
@@ -76,8 +77,9 @@ def run_tests():
         print(f"  [PASS] Status changed to COMPLETED -> Vehicle {test_vehicle.vehicle_id} restored to AVAILABLE")
 
         print("\n[TASK ii] Testing Driver Assignment System...")
-        driver_code = f"DRV-TST-{int(datetime.utcnow().timestamp()) % 10000}"
-        lic_number = f"LIC-TEST-{int(datetime.utcnow().timestamp()) % 10000}"
+        u_suffix = uuid.uuid4().hex[:8]
+        driver_code = f"DRV-TST-{u_suffix}"
+        lic_number = f"LIC-TEST-{u_suffix}"
         driver_payload = DriverCreate(
             driver_code=driver_code,
             name="Alex Sterling (Test Driver)",
@@ -111,7 +113,7 @@ def run_tests():
         print("\n[TASK iii] Testing Maintenance Alerts & Reports...")
         # Add an overdue maintenance job to trigger alert
         overdue_log = MaintenanceLog(
-            job_id=f"MNT-OVD-{int(datetime.utcnow().timestamp()) % 10000}",
+            job_id=f"MNT-OVD-{uuid.uuid4().hex[:8]}",
             vehicle_id=test_vehicle.vehicle_id,
             category="Emergency Brake Line Inspection",
             service_center="Depot West",

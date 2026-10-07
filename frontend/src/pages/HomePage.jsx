@@ -105,9 +105,52 @@ export default function HomePage({ user }) {
         </div>
       </div>
 
+      {/* Milestone 4 Production Status Banner */}
+      <div style={{
+        background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.12) 0%, rgba(56, 189, 248, 0.12) 100%)',
+        border: '1px solid rgba(16, 185, 129, 0.3)',
+        borderRadius: '12px',
+        padding: '12px 20px',
+        marginBottom: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '18px' }}>🚀</span>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#10b981' }}>
+              Milestone 4: Production Deployment & Verification Ready
+            </div>
+            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+              All 10 modules verified: User RBAC, Fleet, GPS Tracking, Route Optimization, Maintenance, Drivers, Analytics, Notifications & Reports.
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => navigate('/analytics')}
+            style={{
+              padding: '6px 14px',
+              fontSize: '11px',
+              fontWeight: '700',
+              borderRadius: '6px',
+              border: '1px solid #0284c7',
+              background: 'rgba(2, 132, 199, 0.2)',
+              color: '#38bdf8',
+              cursor: 'pointer'
+            }}
+          >
+            📊 Export Reports
+          </button>
+        </div>
+      </div>
+
       {/* Real-Time Operational KPI Gauges */}
       {metrics && (
-        <div style={homeStyles.metricsGrid}>
+        <div className="kpi-container" style={homeStyles.metricsGrid}>
           <div style={homeStyles.metricCard}>
             <div style={homeStyles.metricLabel}>Total Fleet</div>
             <div style={homeStyles.metricValue}>{metrics.total_vehicles}</div>
@@ -145,7 +188,7 @@ export default function HomePage({ user }) {
           </div>
         </div>
 
-        <div style={homeStyles.modulesGrid}>
+        <div className="dashboard-grid" style={homeStyles.modulesGrid}>
           {modules.map((m) => (
             <div
               key={m.id}

@@ -318,3 +318,31 @@ class FuelLog(Base):
 
     vehicle = relationship("Vehicle", back_populates="fuel_logs")
     trip = relationship("Trip")
+
+class NotificationType(str, enum.Enum):
+    MAINTENANCE_ALERT = "Maintenance Alert"
+    DELIVERY_NOTIFICATION = "Delivery Notification"
+    DRIVER_ASSIGNMENT = "Driver Assignment Alert"
+    SHIPMENT_STATUS = "Shipment Status Update"
+    ROUTE_CHANGE = "Route Change Alert"
+    SYSTEM_ALERT = "System Alert"
+
+class NotificationChannel(str, enum.Enum):
+    EMAIL = "Email"
+    SMS = "SMS"
+    PUSH = "Push"
+    IN_APP = "In-App"
+
+class NotificationRecord(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_type = Column(FlexibleEnum(NotificationType), nullable=False)
+    channel = Column(FlexibleEnum(NotificationChannel), default=NotificationChannel.IN_APP, nullable=False)
+    recipient = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    reference_id = Column(String, nullable=True)
+    status = Column(String, default="SENT")
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -7,21 +7,89 @@ from sqlalchemy import func
 from app.models import (
     Vehicle, VehicleStatus, Shipment, ShipmentStatus,
     Trip, TripStatus, MaintenanceLog, MaintenanceStatus,
-    MaintenanceAlert, Driver, FuelLog
+    MaintenanceAlert, Driver, FuelLog, GPSBreadcrumb
 )
 from app.schemas import FuelLogCreate
+from app.services.route_optimizer import RouteOptimizer
 
 class AnalyticsService:
 
     @staticmethod
     def get_operational_overview(db: Session) -> Dict[str, Any]:
-        total_fleet = db.query(Vehicle).count()
-        available_count = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.AVAILABLE).count()
-        in_transit_count = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.IN_TRANSIT).count()
-        maintenance_count = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.MAINTENANCE).count()
+        vehicles = db.query(Vehicle).all()
+        total_fleet = len(vehicles)
 
-        active_count = in_transit_count
-        utilization = ((total_fleet - available_count) / total_fleet * 100.0) if total_fleet > 0 else 0.0
+        # Cross-reference active trips and shipments to identify active fleets in transit
+        active_trips = db.query(Trip).filter(Trip.status == TripStatus.IN_TRANSIT).all()
+        active_shipments = db.query(Shipment).filter(Shipment.status == ShipmentStatus.IN_TRANSIT).all()
+
+        # Track currently assigned transit vehicle IDs
+        assigned_vids = {
+            t.vehicle_id.strip().upper() for t in active_trips if t.vehicle_id
+        } | {
+            s.vehicle_id.strip().upper() for s in active_shipments if s.vehicle_id
+        }
+
+        # Auto-pair any in-transit shipments lacking an assigned vehicle with an available fleet asset
+        has_updates = False
+        for s in active_shipments:
+            if not s.vehicle_id:
+                weight_tons = (s.weight_kg or 100.0) / 1000.0
+                avail_v = None
+                for candidate in vehicles:
+                    c_id = (candidate.vehicle_id or "").strip().upper()
+                    if candidate.status == VehicleStatus.AVAILABLE and c_id not in assigned_vids and candidate.capacity >= weight_tons:
+                        avail_v = candidate
+                        break
+                if not avail_v:
+                    for candidate in vehicles:
+                        c_id = (candidate.vehicle_id or "").strip().upper()
+                        if candidate.status == VehicleStatus.AVAILABLE and c_id not in assigned_vids:
+                            avail_v = candidate
+                            break
+                if avail_v:
+                    s.vehicle_id = avail_v.vehicle_id
+                    avail_v.status = VehicleStatus.IN_TRANSIT
+                    assigned_vids.add((avail_v.vehicle_id or "").strip().upper())
+                    db.add(s)
+                    db.add(avail_v)
+                    has_updates = True
+        if has_updates:
+            db.commit()
+
+        in_transit_vids = {
+            t.vehicle_id.strip().upper() for t in active_trips if t.vehicle_id
+        } | {
+            s.vehicle_id.strip().upper() for s in active_shipments if s.vehicle_id
+        }
+
+        in_transit_count = 0
+        maintenance_count = 0
+        available_count = 0
+
+        for v in vehicles:
+            vid = (v.vehicle_id or "").strip().upper()
+            if v.status == VehicleStatus.MAINTENANCE:
+                maintenance_count += 1
+            elif v.status == VehicleStatus.IN_TRANSIT or vid in in_transit_vids:
+                in_transit_count += 1
+                if v.status != VehicleStatus.IN_TRANSIT:
+                    v.status = VehicleStatus.IN_TRANSIT
+                    db.add(v)
+                    has_updates = True
+            else:
+                available_count += 1
+
+        if has_updates:
+            db.commit()
+
+        # Safeguard: ensure active_count accounts for all active transit operations in shipment tracking
+        active_count = max(in_transit_count, min(total_fleet - maintenance_count, len(active_shipments)))
+        in_transit_count = active_count
+        available_count = max(0, total_fleet - in_transit_count - maintenance_count)
+
+        # Active fleet utilization measures the percentage of total fleet assets actively in transit
+        utilization = (active_count / total_fleet * 100.0) if total_fleet > 0 else 0.0
 
         # Shipments KPI
         total_shipments = db.query(Shipment).count()
@@ -30,12 +98,19 @@ class AnalyticsService:
         completed_or_delayed = delivered_count + delayed_count
         on_time_rate = (delivered_count / completed_or_delayed * 100.0) if completed_or_delayed > 0 else 96.5
 
-        # Distance & Trips KPI
+        # Distance & Operations KPI: Baseline trips + standalone direct consignments
         trips = db.query(Trip).all()
-        total_distance = sum(t.total_distance_km or 0.0 for t in trips)
-        if total_distance == 0.0:
+        base_distance = sum(t.total_distance_km or 0.0 for t in trips)
+        if base_distance == 0.0:
             shipments = db.query(Shipment).all()
-            total_distance = sum(s.distance_km or 12.5 for s in shipments)
+            base_distance = sum(s.distance_km or 12.5 for s in shipments)
+        else:
+            standalone_shipments = db.query(Shipment).filter(Shipment.trip_id == None).all()
+            base_distance += sum(s.distance_km or 0.0 for s in standalone_shipments if s.status == ShipmentStatus.DELIVERED)
+
+        # Real-time GPS distance recorded from live satellite tracking telemetry
+        gps_logged_km = AnalyticsService.get_gps_logged_distance(db)
+        total_distance = base_distance + gps_logged_km
 
         # Fuel spend
         fuel_logs = db.query(FuelLog).all()
@@ -64,20 +139,58 @@ class AnalyticsService:
             "on_time_delivery_rate": round(on_time_rate, 1),
             "total_shipments_delivered": delivered_count,
             "total_distance_km": round(total_distance, 1),
+            "base_operations_distance_km": round(base_distance, 1),
+            "gps_logged_distance_km": round(gps_logged_km, 1),
             "total_fuel_consumed_liters": round(total_fuel_liters, 1),
             "total_maintenance_spend": round(total_maintenance_spend, 2),
             "active_maintenance_alerts": active_alerts
         }
 
     @staticmethod
+    def get_gps_logged_distance(db: Session) -> float:
+        """
+        Calculate total distance (in km) recorded by live GPS telemetry breadcrumbs.
+        Aggregates sequential coordinate movements across all tracked fleet vehicles.
+        """
+        try:
+            crumbs = (
+                db.query(GPSBreadcrumb.vehicle_id, GPSBreadcrumb.latitude, GPSBreadcrumb.longitude)
+                .order_by(GPSBreadcrumb.vehicle_id, GPSBreadcrumb.recorded_at.asc(), GPSBreadcrumb.id.asc())
+                .all()
+            )
+            if not crumbs or len(crumbs) < 2:
+                return 0.0
+
+            total_gps_dist = 0.0
+            for i in range(1, len(crumbs)):
+                prev_vid, prev_lat, prev_lng = crumbs[i - 1]
+                curr_vid, curr_lat, curr_lng = crumbs[i]
+                if prev_vid and curr_vid and prev_vid.strip().upper() == curr_vid.strip().upper():
+                    d = RouteOptimizer.haversine(prev_lat, prev_lng, curr_lat, curr_lng)
+                    if 0.001 <= d <= 250.0:
+                        total_gps_dist += d
+
+            return round(total_gps_dist, 1)
+        except Exception:
+            return 0.0
+
+    @staticmethod
     def get_fleet_utilization(db: Session) -> Dict[str, Any]:
         vehicles = db.query(Vehicle).all()
         total = len(vehicles)
-        available = sum(1 for v in vehicles if v.status == VehicleStatus.AVAILABLE)
-        in_transit = sum(1 for v in vehicles if v.status == VehicleStatus.IN_TRANSIT)
-        maintenance = sum(1 for v in vehicles if v.status == VehicleStatus.MAINTENANCE)
 
-        overall = ((total - available) / total * 100.0) if total > 0 else 0.0
+        active_trips = db.query(Trip).filter(Trip.status == TripStatus.IN_TRANSIT).all()
+        active_shipments = db.query(Shipment).filter(Shipment.status == ShipmentStatus.IN_TRANSIT).all()
+
+        in_transit_vids = {
+            t.vehicle_id.strip().upper() for t in active_trips if t.vehicle_id
+        } | {
+            s.vehicle_id.strip().upper() for s in active_shipments if s.vehicle_id
+        }
+
+        available = 0
+        in_transit = 0
+        maintenance = 0
 
         # Breakdown by vehicle type
         by_type_map = {}
@@ -86,8 +199,19 @@ class AnalyticsService:
             if vt not in by_type_map:
                 by_type_map[vt] = {"type": vt, "total": 0, "active": 0}
             by_type_map[vt]["total"] += 1
-            if v.status in [VehicleStatus.IN_TRANSIT, VehicleStatus.MAINTENANCE]:
+
+            vid = (v.vehicle_id or "").strip().upper()
+            if v.status == VehicleStatus.MAINTENANCE:
+                maintenance += 1
+            elif v.status == VehicleStatus.IN_TRANSIT or vid in in_transit_vids:
+                in_transit += 1
                 by_type_map[vt]["active"] += 1
+            else:
+                available += 1
+
+        in_transit = max(in_transit, min(total - maintenance, len(active_shipments)))
+        available = max(0, total - in_transit - maintenance)
+        overall = (in_transit / total * 100.0) if total > 0 else 0.0
 
         by_vehicle_type = []
         for vt, d in by_type_map.items():
@@ -260,6 +384,8 @@ class AnalyticsService:
         writer.writerow(["On-Time Delivery Rate (%)", f"{overview['on_time_delivery_rate']}%"])
         writer.writerow(["Total Delivered Shipments", overview["total_shipments_delivered"]])
         writer.writerow(["Total Distance Covered (km)", overview["total_distance_km"]])
+        if overview.get("gps_logged_distance_km"):
+            writer.writerow(["Live GPS Telemetry Logged (km)", overview["gps_logged_distance_km"]])
         writer.writerow(["Total Fuel Consumed (L)", overview["total_fuel_consumed_liters"]])
         writer.writerow(["Total Maintenance Spend ($)", f"${overview['total_maintenance_spend']}"])
         writer.writerow(["Active Maintenance Alerts", overview["active_maintenance_alerts"]])

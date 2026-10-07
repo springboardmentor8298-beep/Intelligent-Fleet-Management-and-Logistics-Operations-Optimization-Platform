@@ -1,0 +1,84 @@
+name: FleetFlow CI/CD Pipeline & Milestone 4 Deployment
+
+on:
+  push:
+    branches: [ "main", "Pranesh-S", "release/**" ]
+  pull_request:
+    branches: [ "main", "Pranesh-S" ]
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Test & Quality Assurance Validation
+  # ----------------------------------------------------------------------------
+  test-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install reportlab openpyxl
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Frontend Dependencies & Build
+        run: |
+          cd frontend
+          npm ci || npm install
+          npm run build
+
+      - name: Run Milestone 4 Automated Test Suite
+        env:
+          DATABASE_URL: sqlite:///./test_fleetflow.db
+          SECRET_KEY: ci_secret_key_fleetflow_2026
+        run: |
+          echo "Executing Milestone 4 and Workflow validation checks..."
+          python run_all_milestone_tests.py
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Build & Validate Docker Containers
+  # ----------------------------------------------------------------------------
+  docker-build:
+    needs: test-and-validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Backend Docker Build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: fleetflow-backend:latest
+
+      - name: Validate Frontend Docker Build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: fleetflow-frontend:latest
+
+      - name: Validate Docker Compose Stack
+        run: |
+          docker compose config --quiet
+          echo "Docker Compose configurations verified successfully."

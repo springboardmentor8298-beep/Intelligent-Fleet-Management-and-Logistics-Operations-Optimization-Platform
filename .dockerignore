@@ -1,0 +1,17 @@
+**/.git
+**/.gitignore
+**/.vscode
+**/.idea
+**/*.md
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/node_modules
+**/.venv*
+**/venv*
+**/dist
+**/*.log
+.env
+.env.local
+scratch/

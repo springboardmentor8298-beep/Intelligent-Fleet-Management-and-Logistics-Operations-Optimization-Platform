@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models import Vehicle, VehicleStatus, UserRole
 from app.schemas import VehicleCreate, VehicleResponse, FleetMetrics
 from app.auth import require_roles, get_current_user
+from app.services.analytics_service import AnalyticsService
 
 router = APIRouter(prefix="/vehicles", tags=["Fleet Management"])
 
@@ -31,12 +32,12 @@ def list_vehicles(db: Session = Depends(get_db)):
 
 @router.get("/metrics", response_model=FleetMetrics)
 def get_fleet_metrics(db: Session = Depends(get_db)):
-    total = db.query(Vehicle).count()
-    available = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.AVAILABLE).count()
-    in_transit = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.IN_TRANSIT).count()
-    maintenance = db.query(Vehicle).filter(Vehicle.status == VehicleStatus.MAINTENANCE).count()
-    
-    utilization = ((total - available) / total * 100.0) if total > 0 else 0.0
+    overview = AnalyticsService.get_operational_overview(db)
+    total = overview["total_fleet_size"]
+    in_transit = overview["active_fleet_count"]
+    maintenance = overview["maintenance_fleet_count"]
+    available = max(0, total - in_transit - maintenance)
+    utilization = overview["fleet_utilization_rate"]
 
     return FleetMetrics(
         total_vehicles=total,

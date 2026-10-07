@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from ..database import get_db
 from .. import models, schemas
@@ -168,9 +169,49 @@ def update_shipment_status(shipment_id: int, update_data: schemas.ShipmentStatus
     if update_data.longitude is not None:
         shipment.current_lng = update_data.longitude
 
-    if update_data.status == models.ShipmentStatus.DELIVERED:
+    if update_data.status == models.ShipmentStatus.IN_TRANSIT:
+        if not shipment.vehicle_id:
+            assigned_vids = {
+                (t.vehicle_id or "").strip().upper() for t in db.query(models.Trip).filter(models.Trip.status == models.TripStatus.IN_TRANSIT).all() if t.vehicle_id
+            } | {
+                (s.vehicle_id or "").strip().upper() for s in db.query(models.Shipment).filter(models.Shipment.status == models.ShipmentStatus.IN_TRANSIT).all() if s.vehicle_id
+            }
+            weight_tons = (shipment.weight_kg or 100.0) / 1000.0
+            avail_v = db.query(models.Vehicle).filter(
+                models.Vehicle.status == models.VehicleStatus.AVAILABLE,
+                models.Vehicle.capacity >= weight_tons,
+                ~models.Vehicle.vehicle_id.in_(assigned_vids)
+            ).first()
+            if not avail_v:
+                avail_v = db.query(models.Vehicle).filter(
+                    models.Vehicle.status == models.VehicleStatus.AVAILABLE,
+                    ~models.Vehicle.vehicle_id.in_(assigned_vids)
+                ).first()
+            if avail_v:
+                shipment.vehicle_id = avail_v.vehicle_id
+                avail_v.status = models.VehicleStatus.IN_TRANSIT
+                db.add(avail_v)
+        elif shipment.vehicle_id:
+            db.query(models.Vehicle).filter(
+                func.lower(models.Vehicle.vehicle_id) == func.lower(shipment.vehicle_id.strip())
+            ).update({"status": models.VehicleStatus.IN_TRANSIT}, synchronize_session=False)
+    elif update_data.status == models.ShipmentStatus.DELIVERED:
         shipment.delivered_at = datetime.utcnow()
         shipment.eta = "Delivered"
+        if shipment.vehicle_id:
+            other_active_s = db.query(models.Shipment).filter(
+                func.lower(models.Shipment.vehicle_id) == func.lower(shipment.vehicle_id.strip()),
+                models.Shipment.id != shipment.id,
+                models.Shipment.status == models.ShipmentStatus.IN_TRANSIT
+            ).first()
+            other_active_t = db.query(models.Trip).filter(
+                func.lower(models.Trip.vehicle_id) == func.lower(shipment.vehicle_id.strip()),
+                models.Trip.status == models.TripStatus.IN_TRANSIT
+            ).first()
+            if not other_active_s and not other_active_t:
+                db.query(models.Vehicle).filter(
+                    func.lower(models.Vehicle.vehicle_id) == func.lower(shipment.vehicle_id.strip())
+                ).update({"status": models.VehicleStatus.AVAILABLE}, synchronize_session=False)
 
     event = models.ShipmentEvent(
         shipment_id=shipment.id,
@@ -230,10 +271,112 @@ async def tracking_endpoint(websocket: WebSocket, tracking_number: str, db: Sess
             shipment.current_lat = origin_lat
             shipment.current_lng = origin_lng
             shipment.delivered_at = None
+            if not shipment.vehicle_id:
+                assigned_vids = {
+                    (t.vehicle_id or "").strip().upper() for t in db.query(models.Trip).filter(models.Trip.status == models.TripStatus.IN_TRANSIT).all() if t.vehicle_id
+                } | {
+                    (s.vehicle_id or "").strip().upper() for s in db.query(models.Shipment).filter(models.Shipment.status == models.ShipmentStatus.IN_TRANSIT).all() if s.vehicle_id
+                }
+                avail_v = db.query(models.Vehicle).filter(
+                    models.Vehicle.status == models.VehicleStatus.AVAILABLE,
+                    ~models.Vehicle.vehicle_id.in_(assigned_vids)
+                ).first()
+                if not avail_v:
+                    avail_v = db.query(models.Vehicle).filter(models.Vehicle.status == models.VehicleStatus.AVAILABLE).first()
+                if not avail_v:
+                    avail_v = db.query(models.Vehicle).first()
+                if avail_v:
+                    shipment.vehicle_id = avail_v.vehicle_id
+                    avail_v.status = models.VehicleStatus.IN_TRANSIT
+                    avail_v.current_lat = start_lat
+                    avail_v.current_lng = start_lng
+                    db.add(avail_v)
+            elif shipment.vehicle_id:
+                db.query(models.Vehicle).filter(
+                    func.lower(models.Vehicle.vehicle_id) == func.lower(shipment.vehicle_id.strip())
+                ).update({
+                    "status": models.VehicleStatus.IN_TRANSIT,
+                    "current_lat": start_lat,
+                    "current_lng": start_lng
+                }, synchronize_session=False)
+
+            # Record initial live GPS breadcrumb
+            init_breadcrumb = models.GPSBreadcrumb(
+                trip_id=shipment.trip_id if shipment else None,
+                vehicle_id=shipment.vehicle_id if shipment else None,
+                latitude=start_lat,
+                longitude=start_lng,
+                speed_kmh=0.0,
+                heading_deg=0.0,
+                recorded_at=datetime.utcnow()
+            )
+            db.add(init_breadcrumb)
+
+            # Log live tracking start event
+            db.add(models.ShipmentEvent(
+                shipment_id=shipment.id,
+                status=models.ShipmentStatus.IN_TRANSIT,
+                location_desc=f"Transit re-initialized from {shipment.origin}",
+                latitude=start_lat,
+                longitude=start_lng,
+                note="Real-time satellite GPS tracking telemetry initiated."
+            ))
             db.commit()
     else:
         start_lat = shipment.current_lat if (shipment and shipment.current_lat) else origin_lat
         start_lng = shipment.current_lng if (shipment and shipment.current_lng) else origin_lng
+        if shipment:
+            shipment.status = models.ShipmentStatus.IN_TRANSIT
+            if not shipment.vehicle_id:
+                assigned_vids = {
+                    (t.vehicle_id or "").strip().upper() for t in db.query(models.Trip).filter(models.Trip.status == models.TripStatus.IN_TRANSIT).all() if t.vehicle_id
+                } | {
+                    (s.vehicle_id or "").strip().upper() for s in db.query(models.Shipment).filter(models.Shipment.status == models.ShipmentStatus.IN_TRANSIT).all() if s.vehicle_id
+                }
+                avail_v = db.query(models.Vehicle).filter(
+                    models.Vehicle.status == models.VehicleStatus.AVAILABLE,
+                    ~models.Vehicle.vehicle_id.in_(assigned_vids)
+                ).first()
+                if not avail_v:
+                    avail_v = db.query(models.Vehicle).filter(models.Vehicle.status == models.VehicleStatus.AVAILABLE).first()
+                if not avail_v:
+                    avail_v = db.query(models.Vehicle).first()
+                if avail_v:
+                    shipment.vehicle_id = avail_v.vehicle_id
+                    avail_v.status = models.VehicleStatus.IN_TRANSIT
+                    avail_v.current_lat = start_lat
+                    avail_v.current_lng = start_lng
+                    db.add(avail_v)
+            elif shipment.vehicle_id:
+                db.query(models.Vehicle).filter(
+                    func.lower(models.Vehicle.vehicle_id) == func.lower(shipment.vehicle_id.strip())
+                ).update({
+                    "status": models.VehicleStatus.IN_TRANSIT,
+                    "current_lat": start_lat,
+                    "current_lng": start_lng
+                }, synchronize_session=False)
+
+            # Record initial live GPS breadcrumb
+            init_breadcrumb = models.GPSBreadcrumb(
+                trip_id=shipment.trip_id if shipment else None,
+                vehicle_id=shipment.vehicle_id if shipment else None,
+                latitude=start_lat,
+                longitude=start_lng,
+                speed_kmh=shipment.speed_kmh or 0.0,
+                heading_deg=0.0,
+                recorded_at=datetime.utcnow()
+            )
+            db.add(init_breadcrumb)
+
+            db.add(models.ShipmentEvent(
+                shipment_id=shipment.id,
+                status=models.ShipmentStatus.IN_TRANSIT,
+                location_desc=f"In-transit tracking active at ({start_lat:.4f}, {start_lng:.4f})",
+                latitude=start_lat,
+                longitude=start_lng,
+                note="Real-time satellite GPS tracking telemetry stream active."
+            ))
+            db.commit()
 
     # Precompute realistic route path with density scaled to route distance
     route_calc = RouteOptimizer.optimize_route(
@@ -297,26 +440,113 @@ async def tracking_endpoint(websocket: WebSocket, tracking_number: str, db: Sess
                 "remaining_km": remaining_km,
                 "status": current_status,
                 "vehicle_type": vehicle_type,
+                "vehicle_id": shipment.vehicle_id if shipment else None,
                 "is_delayed": eta_info["is_delayed"],
                 "delay_reason": eta_info["delay_reason"],
+                "step_idx": step_idx + 1,
+                "total_steps": total_steps,
                 "timestamp": datetime.utcnow().isoformat()
             }
 
             await websocket.send_text(json.dumps(payload))
 
+            # Record GPS breadcrumb log in database on every step
+            breadcrumb = models.GPSBreadcrumb(
+                trip_id=shipment.trip_id if shipment else None,
+                vehicle_id=shipment.vehicle_id if shipment else None,
+                latitude=lat,
+                longitude=lng,
+                speed_kmh=speed,
+                heading_deg=heading,
+                recorded_at=datetime.utcnow()
+            )
+            db.add(breadcrumb)
+
             # Update DB coordinates periodically and upon delivery
-            if shipment and (step_idx % 3 == 0 or is_delivered):
+            if shipment and (step_idx % 2 == 0 or is_delivered):
                 shipment.current_lat = lat
                 shipment.current_lng = lng
                 shipment.speed_kmh = speed
+
+                # Keep assigned vehicle coordinates synchronized in the Vehicle table
+                if shipment.vehicle_id:
+                    db.query(models.Vehicle).filter(
+                        func.lower(models.Vehicle.vehicle_id) == func.lower(shipment.vehicle_id.strip())
+                    ).update({
+                        "current_lat": lat,
+                        "current_lng": lng,
+                        "status": models.VehicleStatus.IN_TRANSIT
+                    }, synchronize_session=False)
+
+                # Milestone checkpoint audit logs for ShipmentEvent
+                if total_steps >= 4:
+                    quarter = total_steps // 4
+                    if step_idx == quarter:
+                        db.add(models.ShipmentEvent(
+                            shipment_id=shipment.id,
+                            status=models.ShipmentStatus.IN_TRANSIT,
+                            location_desc=f"Transit checkpoint: 25% completed (~{remaining_km:.1f} km remaining)",
+                            latitude=lat,
+                            longitude=lng,
+                            note=f"Live satellite GPS verified at velocity {speed:.1f} km/h"
+                        ))
+                    elif step_idx == quarter * 2:
+                        db.add(models.ShipmentEvent(
+                            shipment_id=shipment.id,
+                            status=models.ShipmentStatus.IN_TRANSIT,
+                            location_desc=f"Midway corridor checkpoint: 50% completed (~{remaining_km:.1f} km remaining)",
+                            latitude=lat,
+                            longitude=lng,
+                            note=f"Live satellite GPS verified at velocity {speed:.1f} km/h"
+                        ))
+                    elif step_idx == quarter * 3:
+                        db.add(models.ShipmentEvent(
+                            shipment_id=shipment.id,
+                            status=models.ShipmentStatus.IN_TRANSIT,
+                            location_desc=f"Approaching destination hub: 75% completed (~{remaining_km:.1f} km remaining)",
+                            latitude=lat,
+                            longitude=lng,
+                            note=f"Live satellite GPS verified at velocity {speed:.1f} km/h"
+                        ))
+
                 if is_delivered and shipment.status != models.ShipmentStatus.DELIVERED:
                     shipment.status = models.ShipmentStatus.DELIVERED
                     shipment.delivered_at = datetime.utcnow()
                     shipment.eta = "Delivered"
+
+                    # Log delivery event
+                    db.add(models.ShipmentEvent(
+                        shipment_id=shipment.id,
+                        status=models.ShipmentStatus.DELIVERED,
+                        location_desc=f"Destination terminal reached: {shipment.destination}",
+                        latitude=lat,
+                        longitude=lng,
+                        note="Consignment successfully delivered by fleet asset."
+                    ))
+
+                    if shipment.vehicle_id:
+                        other_active_s = db.query(models.Shipment).filter(
+                            func.lower(models.Shipment.vehicle_id) == func.lower(shipment.vehicle_id.strip()),
+                            models.Shipment.id != shipment.id,
+                            models.Shipment.status == models.ShipmentStatus.IN_TRANSIT
+                        ).first()
+                        other_active_t = db.query(models.Trip).filter(
+                            func.lower(models.Trip.vehicle_id) == func.lower(shipment.vehicle_id.strip()),
+                            models.Trip.status == models.TripStatus.IN_TRANSIT
+                        ).first()
+                        target_status = models.VehicleStatus.IN_TRANSIT if (other_active_s or other_active_t) else models.VehicleStatus.AVAILABLE
+                        db.query(models.Vehicle).filter(
+                            func.lower(models.Vehicle.vehicle_id) == func.lower(shipment.vehicle_id.strip())
+                        ).update({
+                            "status": target_status,
+                            "current_lat": lat,
+                            "current_lng": lng
+                        }, synchronize_session=False)
+
                 db.commit()
 
             if is_delivered:
-                # Arrival complete! DO NOT oscillate back to origin. Stay parked at destination.
+                # Arrival complete! Stay parked at destination.
                 break
 
             await asyncio.sleep(1.0)
@@ -327,3 +557,57 @@ async def tracking_endpoint(websocket: WebSocket, tracking_number: str, db: Sess
         pass
     finally:
         manager.disconnect(tracking_number, websocket)
+
+@router.get("/track/{tracking_number}/gps-logs")
+def get_shipment_gps_logs(tracking_number: str, limit: int = 150, db: Session = Depends(get_db)):
+    """
+    Retrieve live GPS breadcrumb logs recorded for a shipment / fleet.
+    """
+    shipment = db.query(models.Shipment).filter(
+        func.lower(models.Shipment.tracking_number) == func.lower(tracking_number.strip())
+    ).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+
+    query = db.query(models.GPSBreadcrumb)
+    if shipment.trip_id and shipment.vehicle_id:
+        query = query.filter(
+            (models.GPSBreadcrumb.trip_id == shipment.trip_id) | 
+            (func.lower(models.GPSBreadcrumb.vehicle_id) == func.lower(shipment.vehicle_id.strip()))
+        )
+    elif shipment.trip_id:
+        query = query.filter(models.GPSBreadcrumb.trip_id == shipment.trip_id)
+    elif shipment.vehicle_id:
+        query = query.filter(func.lower(models.GPSBreadcrumb.vehicle_id) == func.lower(shipment.vehicle_id.strip()))
+    
+    logs = query.order_by(models.GPSBreadcrumb.recorded_at.desc()).limit(limit).all()
+    return [{
+        "id": b.id,
+        "trip_id": b.trip_id,
+        "vehicle_id": b.vehicle_id,
+        "latitude": b.latitude,
+        "longitude": b.longitude,
+        "speed_kmh": b.speed_kmh,
+        "heading_deg": b.heading_deg,
+        "recorded_at": b.recorded_at.isoformat() if b.recorded_at else None
+    } for b in logs]
+
+@router.delete("/track/{tracking_number}/gps-logs")
+def clear_shipment_gps_logs(tracking_number: str, db: Session = Depends(get_db)):
+    """
+    Clear recorded GPS breadcrumb logs for a shipment / fleet.
+    """
+    shipment = db.query(models.Shipment).filter(
+        func.lower(models.Shipment.tracking_number) == func.lower(tracking_number.strip())
+    ).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+
+    if shipment.trip_id:
+        db.query(models.GPSBreadcrumb).filter(models.GPSBreadcrumb.trip_id == shipment.trip_id).delete(synchronize_session=False)
+    if shipment.vehicle_id:
+        db.query(models.GPSBreadcrumb).filter(
+            func.lower(models.GPSBreadcrumb.vehicle_id) == func.lower(shipment.vehicle_id.strip())
+        ).delete(synchronize_session=False)
+    db.commit()
+    return {"message": "GPS logs cleared successfully"}

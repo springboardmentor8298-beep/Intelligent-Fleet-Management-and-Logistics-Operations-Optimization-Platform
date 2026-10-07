@@ -28,6 +28,9 @@ export const fetchShipmentDetail = (id) => api.get(`/shipments/${id}`);
 export const trackShipmentPublic = (trackingNumber) => api.get(`/shipments/track/${trackingNumber}`);
 export const updateShipmentStatus = (id, data) => api.patch(`/shipments/${id}/status`, data);
 export const geocodeLocation = (query) => api.get('/shipments/geocode', { params: { q: query } });
+export const fetchShipmentGpsLogs = (trackingNumber, limit = 150) => api.get(`/shipments/track/${trackingNumber}/gps-logs`, { params: { limit } });
+export const clearShipmentGpsLogs = (trackingNumber) => api.delete(`/shipments/track/${trackingNumber}/gps-logs`);
+
 
 // --- Trip Scheduling & Route Optimization ---
 export const optimizeRoute = (data) => api.post('/trips/optimize-route', data);

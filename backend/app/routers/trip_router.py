@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from ..database import get_db
 from .. import models, schemas
@@ -129,17 +130,17 @@ def update_trip_status(trip_id: int, new_status: models.TripStatus, db: Session 
     if new_status == models.TripStatus.IN_TRANSIT:
         trip.actual_start = datetime.utcnow()
         if trip.vehicle_id:
-            db.query(models.Vehicle).filter(models.Vehicle.vehicle_id == trip.vehicle_id).update(
-                {"status": models.VehicleStatus.IN_TRANSIT}
-            )
+            db.query(models.Vehicle).filter(
+                func.lower(models.Vehicle.vehicle_id) == func.lower(trip.vehicle_id.strip())
+            ).update({"status": models.VehicleStatus.IN_TRANSIT}, synchronize_session=False)
         for s in trip.shipments:
             s.status = models.ShipmentStatus.IN_TRANSIT
     elif new_status == models.TripStatus.COMPLETED:
         trip.completed_at = datetime.utcnow()
         if trip.vehicle_id:
-            db.query(models.Vehicle).filter(models.Vehicle.vehicle_id == trip.vehicle_id).update(
-                {"status": models.VehicleStatus.AVAILABLE}
-            )
+            db.query(models.Vehicle).filter(
+                func.lower(models.Vehicle.vehicle_id) == func.lower(trip.vehicle_id.strip())
+            ).update({"status": models.VehicleStatus.AVAILABLE}, synchronize_session=False)
         for s in trip.shipments:
             s.status = models.ShipmentStatus.DELIVERED
             s.delivered_at = datetime.utcnow()
