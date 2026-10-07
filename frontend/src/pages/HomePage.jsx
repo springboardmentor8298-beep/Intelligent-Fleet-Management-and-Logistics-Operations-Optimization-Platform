@@ -61,7 +61,7 @@ export default function HomePage({ user }) {
       desc: 'Driver registration, active trip assignments, license details, duty records, and performance scores.',
       icon: '👨‍✈️',
       path: '/drivers',
-      stats: '98.4% On-Time Performance',
+      stats: 'Commercial Roster Active',
       color: '#fbbf24'
     },
     {

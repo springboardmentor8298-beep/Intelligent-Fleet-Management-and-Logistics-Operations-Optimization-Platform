@@ -96,7 +96,7 @@ class AnalyticsService:
         delivered_count = db.query(Shipment).filter(Shipment.status == ShipmentStatus.DELIVERED).count()
         delayed_count = db.query(Shipment).filter(Shipment.status == ShipmentStatus.DELAYED).count()
         completed_or_delayed = delivered_count + delayed_count
-        on_time_rate = (delivered_count / completed_or_delayed * 100.0) if completed_or_delayed > 0 else 96.5
+        on_time_rate = (delivered_count / completed_or_delayed * 100.0) if completed_or_delayed > 0 else 0.0
 
         # Distance & Operations KPI: Baseline trips + standalone direct consignments
         trips = db.query(Trip).all()
@@ -323,9 +323,9 @@ class AnalyticsService:
         total_cost = sum(l.total_cost for l in logs)
 
         valid_efficiencies = [l.fuel_efficiency_km_per_l for l in logs if l.fuel_efficiency_km_per_l]
-        avg_efficiency = round(sum(valid_efficiencies) / len(valid_efficiencies), 2) if valid_efficiencies else 3.85
-        avg_consumption_100k = round((100.0 / avg_efficiency), 2) if avg_efficiency > 0 else 26.0
-        fuel_cost_per_km = round((total_cost / (total_liters * avg_efficiency)), 2) if (total_liters * avg_efficiency) > 0 else 0.38
+        avg_efficiency = round(sum(valid_efficiencies) / len(valid_efficiencies), 2) if valid_efficiencies else 0.0
+        avg_consumption_100k = round((100.0 / avg_efficiency), 2) if avg_efficiency > 0 else 0.0
+        fuel_cost_per_km = round((total_cost / (total_liters * avg_efficiency)), 2) if (total_liters * avg_efficiency) > 0 else 0.0
 
         # Breakdown per vehicle
         v_breakdown_map = {}

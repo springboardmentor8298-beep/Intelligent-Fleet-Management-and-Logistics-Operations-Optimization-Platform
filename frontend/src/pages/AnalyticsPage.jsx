@@ -147,37 +147,37 @@ export default function AnalyticsPage({ user }) {
         <div style={analyticsStyles.kpiCard}>
           <div style={analyticsStyles.kpiLabel}>On-Time Delivery Rate</div>
           <div style={{ ...analyticsStyles.kpiVal, color: '#34d399' }}>
-            {overview ? `${overview.on_time_delivery_rate}%` : '96.8%'}
+            {overview ? `${overview.on_time_delivery_rate}%` : '0.0%'}
           </div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            {overview ? `${overview.total_shipments_delivered} consignments delivered` : 'Consistent SLA'}
+            {overview ? `${overview.total_shipments_delivered} consignments delivered` : 'No deliveries recorded'}
           </div>
         </div>
 
         <div style={analyticsStyles.kpiCard}>
           <div style={analyticsStyles.kpiLabel}>Avg Fleet Fuel Efficiency</div>
           <div style={{ ...analyticsStyles.kpiVal, color: '#38bdf8' }}>
-            {fuel ? fuel.average_efficiency_km_per_l : '3.85'} <span style={{ fontSize: '14px', color: '#64748b' }}>km/L</span>
+            {fuel && fuel.average_efficiency_km_per_l > 0 ? fuel.average_efficiency_km_per_l : '0.00'} <span style={{ fontSize: '14px', color: '#64748b' }}>km/L</span>
           </div>
           <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px' }}>
-            {fuel ? `${fuel.average_consumption_l_per_100km} L/100km avg` : 'Eco-Routing enabled'}
+            {fuel && fuel.average_consumption_l_per_100km > 0 ? `${fuel.average_consumption_l_per_100km} L/100km avg` : 'Eco-Routing enabled'}
           </div>
         </div>
 
         <div style={analyticsStyles.kpiCard}>
           <div style={analyticsStyles.kpiLabel}>Active Fleet Utilization</div>
           <div style={{ ...analyticsStyles.kpiVal, color: '#fbbf24' }}>
-            {overview ? `${overview.fleet_utilization_rate}%` : '78.5%'}
+            {overview ? `${overview.fleet_utilization_rate}%` : '0.0%'}
           </div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-            {overview ? `${overview.active_fleet_count} in transit / ${overview.total_fleet_size} total` : 'Active operations'}
+            {overview ? `${overview.active_fleet_count} in transit / ${overview.total_fleet_size} total` : '0 in transit / 0 total'}
           </div>
         </div>
 
         <div style={analyticsStyles.kpiCard}>
           <div style={analyticsStyles.kpiLabel}>Total Operations Distance</div>
           <div style={{ ...analyticsStyles.kpiVal, color: '#c084fc' }}>
-            {overview ? `${overview.total_distance_km.toLocaleString()}` : '30,405'} <span style={{ fontSize: '14px', color: '#64748b' }}>km</span>
+            {overview ? `${overview.total_distance_km.toLocaleString()}` : '0'} <span style={{ fontSize: '14px', color: '#64748b' }}>km</span>
           </div>
           <div style={{ fontSize: '11px', color: '#34d399', marginTop: '4px' }}>Live GPS logged distance</div>
         </div>
