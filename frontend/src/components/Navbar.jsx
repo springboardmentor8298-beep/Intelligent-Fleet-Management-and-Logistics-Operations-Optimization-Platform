@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useTheme } from '../utils/ThemeContext';
+import { useTracking } from '../utils/TrackingContext';
 
 export default function Navbar({ user, onLogout }) {
   const { theme, toggleTheme } = useTheme();
+  const { isLiveStreaming, activeTrackingNumber, telemetry } = useTracking();
   const isLight = theme === 'light';
 
   const navItems = [
@@ -146,6 +148,41 @@ export default function Navbar({ user, onLogout }) {
       </div>
 
       <div style={staticNavStyles.userSection}>
+        {/* Real-time Background Tracking Badge */}
+        {isLiveStreaming && activeTrackingNumber && (
+          <Link
+            to="/shipments"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '7px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: isLight ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.45)',
+              color: '#10b981',
+              fontSize: '12px',
+              fontWeight: '700',
+              textDecoration: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 0 12px rgba(16, 185, 129, 0.25)',
+              transition: 'all 0.2s ease'
+            }}
+            title="Active shipment streaming in background. Click to view live map."
+          >
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: '#10b981',
+              boxShadow: '0 0 8px #10b981',
+              display: 'inline-block'
+            }} />
+            <span>📡 LIVE: {activeTrackingNumber}</span>
+            <span style={{ fontSize: '11px', color: isLight ? '#047857' : '#6ee7b7' }}>({telemetry.speed || 0} km/h)</span>
+          </Link>
+        )}
+
         {/* Dark Mode / Light Mode Switcher */}
         <button
           onClick={toggleTheme}

@@ -6,7 +6,7 @@ echo ======================================================================
 echo.
 
 echo [1/2] Starting Backend API (FastAPI)...
-start "FleetFlow Backend" cmd /k "cd /d %~dp0backend && ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+start "FleetFlow Backend" cmd /k "cd /d %~dp0backend && ..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"
 
 timeout /t 2 /nobreak >nul
 

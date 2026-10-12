@@ -122,32 +122,44 @@ export default function LiveTrackingMap({
         map.removeLayer(markerRef.current);
         markerRef.current = null;
       }
+      lastCoordsRef.current = null;
+      lastFittedRouteKeyRef.current = '';
     }
 
-    // Origin Marker
-    if (origin && origin.lat && origin.lng) {
+    // Origin Marker (Point A)
+    if (origin && origin.lat !== undefined && origin.lat !== null && origin.lng !== undefined && origin.lng !== null && !isNaN(Number(origin.lat)) && !isNaN(Number(origin.lng))) {
       const oIcon = getOriginIcon();
+      const oPos = [Number(origin.lat), Number(origin.lng)];
+      const popupText = `<b>Origin Hub (A):</b><br>${origin.label || 'Origin'}`;
       if (!originMarkerRef.current || !map.hasLayer(originMarkerRef.current)) {
-        originMarkerRef.current = window.L.marker([origin.lat, origin.lng], { icon: oIcon, zIndexOffset: 500 })
+        originMarkerRef.current = window.L.marker(oPos, { icon: oIcon, zIndexOffset: 500 })
           .addTo(map)
-          .bindPopup(`<b>Origin Hub:</b><br>${origin.label || 'Origin'}`);
+          .bindPopup(popupText);
       } else {
-        originMarkerRef.current.setLatLng([origin.lat, origin.lng]);
-        originMarkerRef.current.setPopupContent(`<b>Origin Hub:</b><br>${origin.label || 'Origin'}`);
+        originMarkerRef.current.setLatLng(oPos);
+        originMarkerRef.current.setPopupContent(popupText);
       }
+    } else if (originMarkerRef.current && map.hasLayer(originMarkerRef.current)) {
+      map.removeLayer(originMarkerRef.current);
+      originMarkerRef.current = null;
     }
 
-    // Destination Marker
-    if (destination && destination.lat && destination.lng) {
+    // Destination Marker (Point B)
+    if (destination && destination.lat !== undefined && destination.lat !== null && destination.lng !== undefined && destination.lng !== null && !isNaN(Number(destination.lat)) && !isNaN(Number(destination.lng))) {
       const dIcon = getDestIcon();
+      const dPos = [Number(destination.lat), Number(destination.lng)];
+      const popupText = `<b>Destination Hub (B):</b><br>${destination.label || 'Destination'}`;
       if (!destMarkerRef.current || !map.hasLayer(destMarkerRef.current)) {
-        destMarkerRef.current = window.L.marker([destination.lat, destination.lng], { icon: dIcon, zIndexOffset: 500 })
+        destMarkerRef.current = window.L.marker(dPos, { icon: dIcon, zIndexOffset: 500 })
           .addTo(map)
-          .bindPopup(`<b>Destination Hub:</b><br>${destination.label || 'Destination'}`);
+          .bindPopup(popupText);
       } else {
-        destMarkerRef.current.setLatLng([destination.lat, destination.lng]);
-        destMarkerRef.current.setPopupContent(`<b>Destination Hub:</b><br>${destination.label || 'Destination'}`);
+        destMarkerRef.current.setLatLng(dPos);
+        destMarkerRef.current.setPopupContent(popupText);
       }
+    } else if (destMarkerRef.current && map.hasLayer(destMarkerRef.current)) {
+      map.removeLayer(destMarkerRef.current);
+      destMarkerRef.current = null;
     }
 
     // Route Polyline and Dynamic Path Segmentation
@@ -223,13 +235,13 @@ export default function LiveTrackingMap({
           // ignore
         }
       }
-    } else if (origin && destination && origin.lat && destination.lat) {
-      const routeKey = `fallback_${origin.lat}_${destination.lat}`;
+    } else if (origin && destination && origin.lat !== undefined && destination.lat !== undefined && !isNaN(Number(origin.lat)) && !isNaN(Number(destination.lat))) {
+      const routeKey = `fallback_${trackingNumber}_${origin.lat}_${destination.lat}`;
       if (lastFittedRouteKeyRef.current !== routeKey) {
         lastFittedRouteKeyRef.current = routeKey;
         const fallbackBounds = window.L.latLngBounds([
-          [origin.lat, origin.lng],
-          [destination.lat, destination.lng]
+          [Number(origin.lat), Number(origin.lng)],
+          [Number(destination.lat), Number(destination.lng)]
         ]);
         map.fitBounds(fallbackBounds, { padding: [50, 50] });
       }

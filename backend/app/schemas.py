@@ -347,6 +347,15 @@ class FuelAnalyticsResponse(BaseModel):
     anomalies_detected: int
     vehicle_fuel_breakdown: List[Dict[str, Any]]
     anomalies: List[FuelLogResponse]
+    shipment_filter: Optional[str] = None
+    shipment_tracking_number: Optional[str] = None
+    shipment_route: Optional[str] = None
+    shipment_distance_km: Optional[float] = None
+    shipment_status: Optional[str] = None
+    is_live_tracking: Optional[bool] = False
+    industry_baseline_cost_per_km: Optional[float] = 0.45
+    is_below_baseline: Optional[bool] = True
+
 
 # --- Milestone 3: Operational Analytics & Dashboard Schemas ---
 class OperationalOverviewResponse(BaseModel):

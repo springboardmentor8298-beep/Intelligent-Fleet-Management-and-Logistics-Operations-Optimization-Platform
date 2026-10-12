@@ -60,7 +60,9 @@ export const fetchDriverHistory = (driverId) => api.get(`/drivers/${driverId}/hi
 export const fetchOperationalOverview = () => api.get('/analytics/overview');
 export const fetchFleetUtilization = () => api.get('/analytics/fleet-utilization');
 export const fetchFleetPerformance = () => api.get('/analytics/performance');
-export const fetchFuelAnalytics = () => api.get('/analytics/fuel');
+export const fetchFuelAnalytics = (shipmentId = null) =>
+  api.get('/analytics/fuel', { params: (shipmentId && shipmentId !== 'all') ? { shipment_id: shipmentId } : {} });
+
 export const logFuelConsumption = (data) => api.post('/analytics/fuel/log', data);
 export const exportOperationalReport = (format = 'csv') => api.get('/analytics/export', {
   params: { format },
@@ -73,7 +75,9 @@ export const triggerMaintenanceAlertsCheck = () => api.post('/tasks/run-maintena
 export const triggerFuelAnomalyScan = () => api.post('/tasks/detect-fuel-anomalies');
 export const triggerDailyReport = () => api.post('/tasks/generate-daily-report');
 
-// --- WebSocket URLs ---
-export const getTrackingSocketUrl = (trackingNumber) => `ws://localhost:8000/shipments/ws/track/${trackingNumber}`;
+export const getTrackingSocketUrl = (trackingNumber) => {
+  const host = (typeof window !== 'undefined' && window.location.hostname) ? window.location.hostname : 'localhost';
+  return `ws://${host}:8000/shipments/ws/track/${trackingNumber}`;
+};
 
 export default api;

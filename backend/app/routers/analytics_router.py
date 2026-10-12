@@ -26,9 +26,13 @@ def get_fleet_performance(db: Session = Depends(get_db)):
     return AnalyticsService.get_fleet_performance(db)
 
 @router.get("/fuel", response_model=FuelAnalyticsResponse)
-def get_fuel_analytics(db: Session = Depends(get_db)):
+def get_fuel_analytics(
+    shipment_id: Optional[str] = Query(None, description="Optional shipment tracking number or ID filter"),
+    db: Session = Depends(get_db)
+):
     """Retrieve dynamic fuel consumption monitoring, efficiency metrics, eco-routing savings, and anomaly alerts."""
-    return AnalyticsService.get_fuel_analytics(db)
+    return AnalyticsService.get_fuel_analytics(db, shipment_id=shipment_id)
+
 
 @router.post("/fuel/log", response_model=FuelLogResponse, status_code=status.HTTP_201_CREATED)
 def log_fuel_consumption(payload: FuelLogCreate, db: Session = Depends(get_db)):

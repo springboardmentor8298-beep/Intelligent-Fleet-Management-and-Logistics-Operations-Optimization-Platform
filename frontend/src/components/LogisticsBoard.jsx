@@ -1,22 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchShipments, createShipment, getTrackingSocketUrl, optimizeRoute, fetchShipmentGpsLogs, clearShipmentGpsLogs } from '../api';
-import { REGIONAL_LOCATIONS, resolveLocationCoords, resolveLocationCoordsAsync, getHeadingCompass } from '../pages/ShipmentsPage';
+import { createShipment } from '../api';
 import LiveTrackingMap from './LiveTrackingMap';
 import TripSchedulerModal from './TripSchedulerModal';
 import ShipmentHistoryModal from './ShipmentHistoryModal';
+import {
+  useTracking,
+  REGIONAL_LOCATIONS,
+  resolveLocationCoords,
+  resolveLocationCoordsAsync,
+  getHeadingCompass
+} from '../utils/TrackingContext';
 
 export default function LogisticsBoard() {
-  const [shipments, setShipments] = useState([]);
-  const [activeTrackingNumber, setActiveTrackingNumber] = useState('');
-  const [activeShipment, setActiveShipment] = useState(null);
-  const [currentCoords, setCurrentCoords] = useState({ lat: 13.0827, lng: 80.2707 });
-  const [routePath, setRoutePath] = useState([]);
-  const [telemetry, setTelemetry] = useState({ speed: 0, heading: 0, eta: '--', remaining_km: 0, status: '', is_delayed: false, delay_reason: '' });
-  const [isLiveStreaming, setIsLiveStreaming] = useState(false);
+  const {
+    shipments,
+    setShipments,
+    activeTrackingNumber,
+    activeShipment,
+    currentCoords,
+    routePath,
+    telemetry,
+    isLiveStreaming,
+    gpsLogs,
+    setGpsLogs,
+    loadShipments,
+    loadHistoricalLogs,
+    selectShipmentForMap,
+    startLiveTracking,
+    stopLiveTracking,
+    toggleLiveTracking,
+    clearGpsLogsAction,
+    resolveOrigin,
+    resolveDestination
+  } = useTracking();
+
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   // Real-time GPS Telemetry Log System State
-  const [gpsLogs, setGpsLogs] = useState([]);
   const [gpsLogFilter, setGpsLogFilter] = useState('ALL');
   const [autoScrollLogs, setAutoScrollLogs] = useState(true);
   const logContainerRef = useRef(null);
@@ -40,13 +60,8 @@ export default function LogisticsBoard() {
     recipient_name: 'Ceylon Logistics Ltd'
   });
 
-  const wsRef = useRef(null);
-
   useEffect(() => {
     loadShipments();
-    return () => {
-      if (wsRef.current) wsRef.current.close();
-    };
   }, []);
 
   useEffect(() => {
@@ -54,175 +69,6 @@ export default function LogisticsBoard() {
       logContainerRef.current.scrollTop = 0;
     }
   }, [gpsLogs, autoScrollLogs]);
-
-  const loadShipments = async () => {
-    try {
-      const res = await fetchShipments();
-      const list = res.data || [];
-      setShipments(list);
-      if (list.length > 0 && !activeTrackingNumber) {
-        selectShipmentForMap(list[0]);
-      }
-    } catch (err) {
-      console.error("Failed to load shipments", err);
-    }
-  };
-
-  const loadHistoricalLogs = async (tn) => {
-    if (!tn) return;
-    try {
-      const res = await fetchShipmentGpsLogs(tn, 150);
-      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setGpsLogs(res.data.map((b, idx) => ({
-          id: `db-${b.id || idx}`,
-          seq: res.data.length - idx,
-          timestamp: b.recorded_at ? new Date(b.recorded_at).toLocaleTimeString() : '--:--:--',
-          isoTime: b.recorded_at,
-          lat: Number(b.latitude),
-          lng: Number(b.longitude),
-          speed: b.speed_kmh || 0,
-          heading: b.heading_deg || 0,
-          vehicle_id: b.vehicle_id || 'Active Fleet',
-          status: b.speed_kmh > 0 ? 'In Transit' : 'Stationary',
-          isHistorical: true
-        })));
-      } else {
-        setGpsLogs([]);
-      }
-    } catch (e) {
-      setGpsLogs([]);
-    }
-  };
-
-  const selectShipmentForMap = async (shipment) => {
-    setActiveTrackingNumber(shipment.tracking_number);
-    setActiveShipment(shipment);
-    loadHistoricalLogs(shipment.tracking_number);
-
-    const startLat = shipment.current_lat || shipment.origin_lat || 13.0827;
-    const startLng = shipment.current_lng || shipment.origin_lng || 80.2707;
-    const destLat = shipment.destination_lat || 6.9271;
-    const destLng = shipment.destination_lng || 79.8612;
-
-    setCurrentCoords({ lat: startLat, lng: startLng });
-    setTelemetry({
-      speed: shipment.speed_kmh || 0,
-      heading: 0,
-      eta: shipment.eta || '--',
-      remaining_km: shipment.distance_km || 0,
-      status: shipment.status,
-      is_delayed: shipment.status === 'Delayed',
-      delay_reason: shipment.status === 'Delayed' ? 'Traffic Congestion Detected' : ''
-    });
-
-    // Compute route path polyline
-    try {
-      const opt = await optimizeRoute({
-        origin_lat: shipment.origin_lat || startLat,
-        origin_lng: shipment.origin_lng || startLng,
-        destination_lat: destLat,
-        destination_lng: destLng,
-        optimization_type: 'Fastest Route'
-      });
-      setRoutePath(opt.data.full_path || []);
-    } catch (e) {
-      // fallback straight segment
-      setRoutePath([
-        [shipment.origin_lat || startLat, shipment.origin_lng || startLng],
-        [destLat, destLng]
-      ]);
-    }
-  };
-
-  const startLiveTracking = (trackingNumber) => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-
-    const target = shipments.find(s => s.tracking_number === trackingNumber);
-    if (target) {
-      selectShipmentForMap(target);
-    }
-
-    setIsLiveStreaming(true);
-    const ws = new WebSocket(getTrackingSocketUrl(trackingNumber));
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        setCurrentCoords({ lat: parsed.lat, lng: parsed.lng });
-        setTelemetry({
-          speed: parsed.speed_kmh,
-          heading: parsed.heading || 0,
-          eta: parsed.eta_display,
-          remaining_km: parsed.remaining_km,
-          status: parsed.status,
-          is_delayed: parsed.is_delayed,
-          delay_reason: parsed.delay_reason
-        });
-
-        // Prepend new live GPS log ping
-        const newLogPing = {
-          id: `live-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          seq: parsed.step_idx || (gpsLogs.length + 1),
-          total_steps: parsed.total_steps,
-          timestamp: new Date().toLocaleTimeString(),
-          isoTime: parsed.timestamp || new Date().toISOString(),
-          lat: parsed.lat,
-          lng: parsed.lng,
-          speed: parsed.speed_kmh,
-          heading: parsed.heading || 0,
-          remaining_km: parsed.remaining_km,
-          eta: parsed.eta_display,
-          status: parsed.status,
-          vehicle_id: parsed.vehicle_id || target?.vehicle_id || activeShipment?.vehicle_id || 'Active Fleet',
-          is_delayed: parsed.is_delayed,
-          delay_reason: parsed.delay_reason,
-          isLive: true
-        };
-        setGpsLogs(prev => [newLogPing, ...prev.slice(0, 199)]);
-
-        // Keep local shipments state synchronized
-        setShipments(prev => prev.map(s => s.tracking_number === parsed.tracking_number ? {
-          ...s,
-          current_lat: parsed.lat,
-          current_lng: parsed.lng,
-          speed_kmh: parsed.speed_kmh,
-          eta: parsed.eta_display,
-          status: parsed.status,
-          vehicle_id: parsed.vehicle_id || s.vehicle_id
-        } : s));
-
-        if (parsed.status === 'Delivered') {
-          setShipments(prev => prev.map(s => s.tracking_number === parsed.tracking_number ? {
-            ...s,
-            status: 'Delivered',
-            current_lat: parsed.lat,
-            current_lng: parsed.lng,
-            speed_kmh: 0,
-            eta: 'Delivered'
-          } : s));
-          setIsLiveStreaming(false);
-          if (wsRef.current) {
-            wsRef.current.close();
-            wsRef.current = null;
-          }
-        }
-      } catch (err) {
-        console.error("WebSocket message parsing error", err);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.log("WebSocket stream idle or completed", err);
-      setIsLiveStreaming(false);
-    };
-
-    ws.onclose = () => {
-      setIsLiveStreaming(false);
-    };
-  };
 
   const exportGpsLogsToCsv = () => {
     if (!gpsLogs || gpsLogs.length === 0) return;
@@ -251,13 +97,7 @@ export default function LogisticsBoard() {
   };
 
   const handleClearGpsLogs = async () => {
-    if (!activeTrackingNumber) return;
-    try {
-      await clearShipmentGpsLogs(activeTrackingNumber);
-      setGpsLogs([]);
-    } catch (err) {
-      setGpsLogs([]);
-    }
+    await clearGpsLogsAction();
   };
 
   const filteredGpsLogs = gpsLogs.filter(log => {
@@ -422,8 +262,8 @@ export default function LogisticsBoard() {
           <LiveTrackingMap
             currentCoords={currentCoords}
             routePath={routePath}
-            origin={activeShipment ? { lat: activeShipment.origin_lat || 13.0827, lng: activeShipment.origin_lng || 80.2707, label: activeShipment.origin } : null}
-            destination={activeShipment ? { lat: activeShipment.destination_lat || 6.9271, lng: activeShipment.destination_lng || 79.8612, label: activeShipment.destination } : null}
+            origin={activeShipment ? resolveOrigin(activeShipment) : null}
+            destination={activeShipment ? resolveDestination(activeShipment) : null}
             trackingNumber={activeTrackingNumber}
             speed={telemetry.speed}
             heading={telemetry.heading}
@@ -741,7 +581,12 @@ export default function LogisticsBoard() {
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '8px' }}>
                       <button
-                        onClick={() => selectShipmentForMap(s)}
+                        onClick={() => {
+                          if (isLiveStreaming) {
+                            stopLiveTracking();
+                          }
+                          selectShipmentForMap(s);
+                        }}
                         style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                       >
                         Map View

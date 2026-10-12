@@ -22,7 +22,16 @@ export default function Login({ onAuthSuccess }) {
       localStorage.setItem('user', JSON.stringify(res.data));
       onAuthSuccess(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Authentication failed. Please verify credentials.');
+      const detail = err.response?.data?.detail;
+      if (typeof detail === 'string') {
+        setError(detail);
+      } else if (Array.isArray(detail)) {
+        setError(detail.map(d => d.msg || JSON.stringify(d)).join(', '));
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError('Cannot connect to backend server. Please verify the API is running at http://localhost:8000.');
+      } else {
+        setError('Authentication failed. Please verify credentials.');
+      }
     } finally {
       setLoading(false);
     }

@@ -10,6 +10,7 @@ import DriversPage from './pages/DriversPage';
 import MaintenancePage from './pages/MaintenancePage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import { ThemeProvider, useTheme } from './utils/ThemeContext';
+import { TrackingProvider } from './utils/TrackingContext';
 
 function MainApp() {
   const { theme } = useTheme();
@@ -47,28 +48,30 @@ function MainApp() {
 
   return (
     <BrowserRouter>
-      <div
-        className={`theme-container ${theme === 'light' ? 'theme-light' : 'theme-dark'}`}
-        style={{
-          minHeight: '100vh',
-          backgroundColor: 'var(--bg-primary, #05070a)',
-          color: 'var(--text-primary, #f8fafc)'
-        }}
-      >
-        <Navbar user={user} onLogout={handleLogout} />
-        <main>
-          <Routes>
-            <Route path="/" element={<HomePage user={user} />} />
-            <Route path="/fleet" element={<FleetPage user={user} />} />
-            <Route path="/shipments" element={<ShipmentsPage user={user} />} />
-            <Route path="/routes" element={<RoutesPage user={user} />} />
-            <Route path="/drivers" element={<DriversPage user={user} />} />
-            <Route path="/maintenance" element={<MaintenancePage user={user} />} />
-            <Route path="/analytics" element={<AnalyticsPage user={user} />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
-      </div>
+      <TrackingProvider>
+        <div
+          className={`theme-container ${theme === 'light' ? 'theme-light' : 'theme-dark'}`}
+          style={{
+            minHeight: '100vh',
+            backgroundColor: 'var(--bg-primary, #05070a)',
+            color: 'var(--text-primary, #f8fafc)'
+          }}
+        >
+          <Navbar user={user} onLogout={handleLogout} />
+          <main>
+            <Routes>
+              <Route path="/" element={<HomePage user={user} />} />
+              <Route path="/fleet" element={<FleetPage user={user} />} />
+              <Route path="/shipments" element={<ShipmentsPage user={user} />} />
+              <Route path="/routes" element={<RoutesPage user={user} />} />
+              <Route path="/drivers" element={<DriversPage user={user} />} />
+              <Route path="/maintenance" element={<MaintenancePage user={user} />} />
+              <Route path="/analytics" element={<AnalyticsPage user={user} />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
+      </TrackingProvider>
     </BrowserRouter>
   );
 }

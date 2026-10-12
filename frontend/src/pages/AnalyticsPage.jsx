@@ -4,11 +4,20 @@ import {
   fetchFleetUtilization,
   fetchFleetPerformance,
   fetchFuelAnalytics,
+  fetchShipments,
   exportOperationalReport,
   triggerDailyReport
 } from '../api';
+import { useTracking } from '../utils/TrackingContext';
 
 export default function AnalyticsPage({ user }) {
+  const {
+    activeShipment,
+    activeTrackingNumber,
+    isLiveStreaming,
+    shipments: contextShipments
+  } = useTracking();
+
   const [exporting, setExporting] = useState(false);
   const [runningCelery, setRunningCelery] = useState(false);
   const [overview, setOverview] = useState(null);
@@ -17,6 +26,8 @@ export default function AnalyticsPage({ user }) {
   const [fuel, setFuel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
+  const [shipmentFilter, setShipmentFilter] = useState('all');
+  const [availableShipments, setAvailableShipments] = useState([]);
 
   const showToast = (text, isError = false) => {
     setToastMessage({ text, isError });
@@ -24,26 +35,37 @@ export default function AnalyticsPage({ user }) {
   };
 
   useEffect(() => {
-    loadAnalytics();
+    if (contextShipments && contextShipments.length > 0) {
+      setAvailableShipments(contextShipments);
+    } else {
+      fetchShipments().then(res => {
+        if (res.data) setAvailableShipments(res.data);
+      }).catch(() => {});
+    }
+  }, [contextShipments]);
+
+  useEffect(() => {
+    loadAnalytics(false, shipmentFilter);
     const interval = setInterval(() => {
-      loadAnalytics(true);
+      loadAnalytics(true, shipmentFilter);
     }, 6000);
-    const handleFocus = () => loadAnalytics(true);
+    const handleFocus = () => loadAnalytics(true, shipmentFilter);
     window.addEventListener('focus', handleFocus);
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, []);
+  }, [shipmentFilter]);
 
-  const loadAnalytics = async (isSilent = false) => {
+  const loadAnalytics = async (isSilent = false, activeFilter = shipmentFilter) => {
     try {
       if (!isSilent) setLoading(true);
+      const filterArg = (activeFilter && activeFilter !== 'all') ? activeFilter : null;
       const [ovRes, utRes, pfRes, flRes] = await Promise.all([
         fetchOperationalOverview(),
         fetchFleetUtilization(),
         fetchFleetPerformance(),
-        fetchFuelAnalytics()
+        fetchFuelAnalytics(filterArg)
       ]);
       setOverview(ovRes.data);
       setUtilization(utRes.data);
@@ -56,6 +78,7 @@ export default function AnalyticsPage({ user }) {
       if (!isSilent) setLoading(false);
     }
   };
+
 
   const handleExport = async (format) => {
     try {
@@ -187,9 +210,28 @@ export default function AnalyticsPage({ user }) {
       <div style={analyticsStyles.fuelSection}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
-              ⛽ Dynamic Fuel Consumption & Anomaly Detection
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>
+                ⛽ Dynamic Fuel Consumption & Anomaly Detection
+              </h3>
+              {isLiveStreaming && (
+                <span style={{
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid #10b981',
+                  color: '#34d399',
+                  padding: '3px 10px',
+                  borderRadius: '9999px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                  Live GPS Tracking Active
+                </span>
+              )}
+            </div>
             <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
               Real-time fuel intake analytics, eco-routing cost savings, and machine-learning burn rate variance detection.
             </p>
@@ -209,35 +251,163 @@ export default function AnalyticsPage({ user }) {
           )}
         </div>
 
+        {/* Shipment Scope & Tracking Filter Bar */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'rgba(15, 23, 42, 0.65)',
+          border: '1px solid #334155',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8' }}>
+              🎯 Fuel Analytics Scope:
+            </span>
+            <select
+              value={shipmentFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setShipmentFilter(val);
+                loadAnalytics(false, val);
+              }}
+              style={{
+                background: '#1e293b',
+                color: '#f8fafc',
+                border: '1px solid #475569',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                outline: 'none',
+                minWidth: '260px'
+              }}
+            >
+              <option value="all">🌐 Entire Fleet Operations (Aggregated)</option>
+              {activeShipment && (
+                <option value={activeShipment.tracking_number}>
+                  🟢 Currently Tracked: {activeShipment.tracking_number} ({activeShipment.origin} → {activeShipment.destination})
+                </option>
+              )}
+              {availableShipments
+                .filter(s => !activeShipment || s.tracking_number !== activeShipment.tracking_number)
+                .map(s => (
+                  <option key={s.id || s.tracking_number} value={s.tracking_number}>
+                    📦 {s.tracking_number} — {s.origin} → {s.destination} ({s.status})
+                  </option>
+                ))
+              }
+            </select>
+
+            {shipmentFilter !== 'all' && (
+              <button
+                onClick={() => {
+                  setShipmentFilter('all');
+                  loadAnalytics(false, 'all');
+                }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #64748b',
+                  color: '#cbd5e1',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                ↺ View Entire Fleet
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {activeShipment && shipmentFilter !== activeShipment.tracking_number && (
+              <button
+                onClick={() => {
+                  setShipmentFilter(activeShipment.tracking_number);
+                  loadAnalytics(false, activeShipment.tracking_number);
+                }}
+                style={{
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid #10b981',
+                  color: '#34d399',
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
+                View Tracked Shipment ({activeShipment.tracking_number})
+              </button>
+            )}
+
+            {shipmentFilter !== 'all' && fuel && fuel.shipment_tracking_number && (
+              <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '600' }}>
+                📍 {fuel.shipment_route} ({fuel.shipment_distance_km} km) • Status: <span style={{ color: '#fbbf24' }}>{fuel.shipment_status}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div style={analyticsStyles.fuelKpiRow}>
           <div style={analyticsStyles.fuelSubCard}>
-            <div style={analyticsStyles.fuelSubLabel}>Total Fuel Consumed</div>
-            <div style={{ ...analyticsStyles.fuelSubVal, color: '#38bdf8' }}>
-              {fuel ? `${fuel.total_liters.toLocaleString()} L` : '3,850 L'}
+            <div style={analyticsStyles.fuelSubLabel}>
+              {shipmentFilter !== 'all' ? `Shipment Fuel Consumed (${fuel?.shipment_tracking_number || shipmentFilter})` : 'Total Fuel Consumed'}
             </div>
-            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-              Total Spend: ${fuel ? fuel.total_fuel_cost.toLocaleString() : '6,545'}
+            <div style={{ ...analyticsStyles.fuelSubVal, color: '#38bdf8' }}>
+              {fuel ? `${fuel.total_liters.toLocaleString()} L` : '0 L'}
+            </div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+              Total Spend: <span style={{ color: '#34d399', fontWeight: '700' }}>${fuel ? fuel.total_fuel_cost.toLocaleString() : '0.00'}</span>
             </div>
           </div>
 
           <div style={analyticsStyles.fuelSubCard}>
-            <div style={analyticsStyles.fuelSubLabel}>Fuel Cost per Kilometer</div>
+            <div style={analyticsStyles.fuelSubLabel}>
+              {shipmentFilter !== 'all' ? 'Shipment Fuel Cost / Km' : 'Fuel Cost per Kilometer'}
+            </div>
             <div style={{ ...analyticsStyles.fuelSubVal, color: '#fbbf24' }}>
               ${fuel ? fuel.fuel_cost_per_km.toFixed(2) : '0.38'} <span style={{ fontSize: '13px', color: '#64748b' }}>/ km</span>
             </div>
-            <div style={{ fontSize: '11px', color: '#34d399', marginTop: '4px' }}>Below industry baseline ($0.45/km)</div>
+            <div style={{
+              fontSize: '11px',
+              color: (fuel && fuel.fuel_cost_per_km <= 0.45) ? '#34d399' : '#f87171',
+              marginTop: '4px',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              {fuel && fuel.fuel_cost_per_km <= 0.45
+                ? '✓ Below industry baseline ($0.45/km)'
+                : '⚠️ Above industry baseline ($0.45/km)'}
+            </div>
           </div>
 
           <div style={analyticsStyles.fuelSubCard}>
-            <div style={analyticsStyles.fuelSubLabel}>Eco-Route Fuel Saved</div>
+            <div style={analyticsStyles.fuelSubLabel}>
+              {shipmentFilter !== 'all' ? 'Eco-Route Saved (Shipment)' : 'Eco-Route Fuel Saved'}
+            </div>
             <div style={{ ...analyticsStyles.fuelSubVal, color: '#34d399' }}>
-              {fuel ? `${fuel.eco_route_savings_liters.toLocaleString()} L` : '2,480 L'}
+              {fuel ? `${fuel.eco_route_savings_liters.toLocaleString()} L` : '0 L'}
             </div>
             <div style={{ fontSize: '11px', color: '#34d399', marginTop: '4px' }}>
-              ~${fuel ? fuel.eco_route_savings_usd.toLocaleString() : '4,216'} algorithmic savings
+              ~${fuel ? fuel.eco_route_savings_usd.toLocaleString() : '0'} algorithmic savings
             </div>
           </div>
         </div>
+
 
         {/* Anomalies List */}
         {fuel && fuel.anomalies && fuel.anomalies.length > 0 && (

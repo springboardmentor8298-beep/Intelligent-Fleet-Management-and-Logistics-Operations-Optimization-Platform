@@ -122,7 +122,7 @@ export default function HomePage({ user }) {
           <span style={{ fontSize: '18px' }}>🚀</span>
           <div>
             <div style={{ fontSize: '13px', fontWeight: '700', color: '#10b981' }}>
-              Milestone 4: Production Deployment & Verification Ready
+              Production Deployment & Verification Ready
             </div>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>
               All 10 modules verified: User RBAC, Fleet, GPS Tracking, Route Optimization, Maintenance, Drivers, Analytics, Notifications & Reports.
