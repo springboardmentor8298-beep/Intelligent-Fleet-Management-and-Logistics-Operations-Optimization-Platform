@@ -109,71 +109,156 @@ class MaintenanceService:
                 db.commit()
 
     @staticmethod
-    def scan_all_maintenance_alerts(db: Session) -> int:
+    def deduplicate_and_trim_alerts(db: Session, target_count: int = 15) -> int:
+        """
+        Deduplicates active maintenance alerts and trims the total active count
+        to a manageable, healthy volume (default 15, within 10-20), resolving duplicates and excess alerts.
+        """
+        unresolved = db.query(MaintenanceAlert).filter(MaintenanceAlert.is_resolved == False).all()
+        if not unresolved:
+            return 0
+
+        def get_priority(a):
+            sev = a.severity.value if hasattr(a.severity, 'value') else str(a.severity)
+            if sev.lower() == "critical":
+                return 0
+            if sev.lower() == "high":
+                return 1
+            if sev.lower() == "medium":
+                return 2
+            return 3
+
+        # Sort: Highest severity first, then newest first
+        sorted_alerts = sorted(unresolved, key=lambda a: (get_priority(a), -a.id))
+
+        seen_keys = set()
+        kept = []
+        to_resolve = []
+
+        for a in sorted_alerts:
+            key = (a.vehicle_id, a.alert_type)
+            # Eliminate duplicate alerts for the same vehicle and alert_type
+            if key in seen_keys:
+                to_resolve.append(a)
+            else:
+                seen_keys.add(key)
+                if len(kept) < target_count:
+                    kept.append(a)
+                else:
+                    to_resolve.append(a)
+
         now = datetime.utcnow()
+        resolved_count = 0
+        for alt in to_resolve:
+            alt.is_resolved = True
+            alt.resolved_at = now
+            resolved_count += 1
+
+        if resolved_count > 0:
+            db.commit()
+
+        return resolved_count
+
+    @staticmethod
+    def scan_all_maintenance_alerts(db: Session, max_active_alerts: int = 15) -> int:
+        """
+        Evaluates fleet maintenance schedules and generates alerts without exceeding
+        the configured threshold (default 15, between 10-20), eliminating alert fatigue.
+        """
+        now = datetime.utcnow()
+
+        # 1. Clean up existing duplicates and trim to target threshold
+        MaintenanceService.deduplicate_and_trim_alerts(db, target_count=max_active_alerts)
+
+        current_active = db.query(MaintenanceAlert).filter(MaintenanceAlert.is_resolved == False).count()
+        if current_active >= max_active_alerts:
+            return 0
+
+        # Existing active alert keys to prevent duplication in this run
+        existing_keys = set(
+            (a.vehicle_id, a.alert_type) for a in db.query(MaintenanceAlert.vehicle_id, MaintenanceAlert.alert_type).filter(
+                MaintenanceAlert.is_resolved == False
+            ).all()
+        )
+
+        # All existing messages (active or resolved) to prevent resurrecting previously resolved alerts
+        previous_messages = set(
+            m[0] for m in db.query(MaintenanceAlert.message).all()
+        )
+
         alerts_created = 0
 
-        # 1. Overdue maintenance checks
-        overdue_jobs = db.query(MaintenanceLog).filter(
-            MaintenanceLog.status == MaintenanceStatus.SCHEDULED,
-            MaintenanceLog.scheduled_date < now
-        ).all()
-
-        for job in overdue_jobs:
-            exists = db.query(MaintenanceAlert).filter(
-                MaintenanceAlert.vehicle_id == job.vehicle_id,
-                MaintenanceAlert.alert_type == "OVERDUE_SERVICE",
-                MaintenanceAlert.is_resolved == False
-            ).first()
-            if not exists:
-                db.add(MaintenanceAlert(
-                    vehicle_id=job.vehicle_id,
-                    alert_type="OVERDUE_SERVICE",
-                    severity=AlertSeverity.HIGH,
-                    message=f"Urgent: Scheduled {job.category} for {job.vehicle_id} is overdue since {job.scheduled_date.strftime('%Y-%m-%d')}."
-                ))
-                alerts_created += 1
-
-        # 2. Critical priority maintenance checks
+        # 2. Critical priority maintenance checks (highest importance)
         critical_jobs = db.query(MaintenanceLog).filter(
             MaintenanceLog.priority == MaintenancePriority.CRITICAL,
             MaintenanceLog.status.in_([MaintenanceStatus.SCHEDULED, MaintenanceStatus.IN_PROGRESS])
         ).all()
 
         for c_job in critical_jobs:
-            exists = db.query(MaintenanceAlert).filter(
-                MaintenanceAlert.vehicle_id == c_job.vehicle_id,
-                MaintenanceAlert.alert_type == "CRITICAL_INSPECTION",
-                MaintenanceAlert.is_resolved == False
-            ).first()
-            if not exists:
+            if current_active + alerts_created >= max_active_alerts:
+                break
+            key = (c_job.vehicle_id, "CRITICAL_INSPECTION")
+            msg = f"Critical Maintenance Alert on {c_job.vehicle_id}: {c_job.category} requires immediate mechanical intervention."
+            if key not in existing_keys and msg not in previous_messages:
                 db.add(MaintenanceAlert(
                     vehicle_id=c_job.vehicle_id,
                     alert_type="CRITICAL_INSPECTION",
                     severity=AlertSeverity.CRITICAL,
-                    message=f"Critical Maintenance Alert on {c_job.vehicle_id}: {c_job.category} requires immediate mechanical intervention."
+                    message=msg
                 ))
+                existing_keys.add(key)
+                previous_messages.add(msg)
                 alerts_created += 1
 
-        # 3. High mileage inspection warning
+        # 3. Overdue maintenance checks
+        overdue_jobs = db.query(MaintenanceLog).filter(
+            MaintenanceLog.status == MaintenanceStatus.SCHEDULED,
+            MaintenanceLog.scheduled_date < now
+        ).all()
+
+        for job in overdue_jobs:
+            if current_active + alerts_created >= max_active_alerts:
+                break
+            key = (job.vehicle_id, "OVERDUE_SERVICE")
+            msg = f"Urgent: Scheduled {job.category} for {job.vehicle_id} is overdue since {job.scheduled_date.strftime('%Y-%m-%d')}."
+            if key not in existing_keys and msg not in previous_messages:
+                db.add(MaintenanceAlert(
+                    vehicle_id=job.vehicle_id,
+                    alert_type="OVERDUE_SERVICE",
+                    severity=AlertSeverity.HIGH,
+                    message=msg
+                ))
+                existing_keys.add(key)
+                previous_messages.add(msg)
+                alerts_created += 1
+
+        # 4. High mileage inspection warning
         vehicles = db.query(Vehicle).all()
+        high_mileage_vehicles = set(
+            v[0] for v in db.query(MaintenanceAlert.vehicle_id).filter(
+                MaintenanceAlert.alert_type == "HIGH_MILEAGE"
+            ).all()
+        )
         for v in vehicles:
+            if current_active + alerts_created >= max_active_alerts:
+                break
             if v.odometer_km and v.odometer_km >= 25000:
-                exists = db.query(MaintenanceAlert).filter(
-                    MaintenanceAlert.vehicle_id == v.vehicle_id,
-                    MaintenanceAlert.alert_type == "HIGH_MILEAGE",
-                    MaintenanceAlert.is_resolved == False
-                ).first()
-                if not exists:
+                key = (v.vehicle_id, "HIGH_MILEAGE")
+                if key not in existing_keys and v.vehicle_id not in high_mileage_vehicles:
+                    msg = f"Vehicle {v.vehicle_id} exceeded {int(v.odometer_km):,} km. Comprehensive mechanical review recommended."
                     db.add(MaintenanceAlert(
                         vehicle_id=v.vehicle_id,
                         alert_type="HIGH_MILEAGE",
                         severity=AlertSeverity.MEDIUM,
-                        message=f"Vehicle {v.vehicle_id} exceeded {int(v.odometer_km):,} km. Comprehensive mechanical review recommended."
+                        message=msg
                     ))
+                    existing_keys.add(key)
+                    high_mileage_vehicles.add(v.vehicle_id)
                     alerts_created += 1
 
-        db.commit()
+        if alerts_created > 0:
+            db.commit()
+
         return alerts_created
 
     @staticmethod
@@ -186,6 +271,17 @@ class MaintenanceService:
         db.commit()
         db.refresh(alert)
         return alert
+
+    @staticmethod
+    def resolve_all_alerts(db: Session) -> int:
+        now = datetime.utcnow()
+        unresolved = db.query(MaintenanceAlert).filter(MaintenanceAlert.is_resolved == False).all()
+        count = len(unresolved)
+        for a in unresolved:
+            a.is_resolved = True
+            a.resolved_at = now
+        db.commit()
+        return count
 
     @staticmethod
     def get_summary_report(db: Session) -> Dict[str, Any]:

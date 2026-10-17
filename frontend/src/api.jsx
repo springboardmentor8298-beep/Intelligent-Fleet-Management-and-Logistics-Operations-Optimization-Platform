@@ -34,6 +34,7 @@ export const clearShipmentGpsLogs = (trackingNumber) => api.delete(`/shipments/t
 
 // --- Trip Scheduling & Route Optimization ---
 export const optimizeRoute = (data) => api.post('/trips/optimize-route', data);
+export const optimizeRouteMatrix = (data) => api.post('/trips/optimize-matrix', data);
 export const scheduleTrip = (data) => api.post('/trips/schedule', data);
 export const fetchTrips = (status) => api.get('/trips/', { params: status ? { status_filter: status } : {} });
 export const updateTripStatus = (tripId, status) => api.patch(`/trips/${tripId}/status?new_status=${encodeURIComponent(status)}`);
@@ -43,8 +44,9 @@ export const fetchMaintenanceJobs = (params) => api.get('/maintenance/', { param
 export const createMaintenanceJob = (data) => api.post('/maintenance/', data);
 export const updateMaintenanceJob = (jobId, data) => api.patch(`/maintenance/${jobId}`, data);
 export const deleteMaintenanceJob = (jobId) => api.delete(`/maintenance/${jobId}`);
-export const fetchMaintenanceAlerts = () => api.get('/maintenance/alerts/active');
+export const fetchMaintenanceAlerts = (limit = 15) => api.get('/maintenance/alerts/active', { params: { limit } });
 export const resolveMaintenanceAlert = (alertId) => api.patch(`/maintenance/alerts/${alertId}/resolve`);
+export const resolveAllMaintenanceAlerts = () => api.post('/maintenance/alerts/resolve-all');
 export const fetchMaintenanceReportSummary = () => api.get('/maintenance/reports/summary');
 
 // --- Milestone 3: Driver Management & Roster ---

@@ -5,6 +5,7 @@ import {
   updateMaintenanceJob,
   fetchMaintenanceAlerts,
   resolveMaintenanceAlert,
+  resolveAllMaintenanceAlerts,
   fetchMaintenanceReportSummary,
   fetchVehicles,
   triggerMaintenanceAlertsCheck
@@ -17,6 +18,8 @@ export default function MaintenancePage({ user }) {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [alertLimit, setAlertLimit] = useState(15);
+  const [alertFilter, setAlertFilter] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -38,7 +41,7 @@ export default function MaintenancePage({ user }) {
 
   useEffect(() => {
     loadData();
-  }, [statusFilter]);
+  }, [statusFilter, alertLimit]);
 
   const loadData = async () => {
     try {
@@ -46,7 +49,7 @@ export default function MaintenancePage({ user }) {
       const params = statusFilter !== 'ALL' ? { status_filter: statusFilter } : {};
       const [jobsRes, alertsRes, summaryRes, vehiclesRes] = await Promise.all([
         fetchMaintenanceJobs(params),
-        fetchMaintenanceAlerts(),
+        fetchMaintenanceAlerts(alertLimit),
         fetchMaintenanceReportSummary(),
         fetchVehicles()
       ]);
@@ -102,11 +105,29 @@ export default function MaintenancePage({ user }) {
 
   const handleResolveAlert = async (alertId) => {
     try {
+      // Immediately remove the alert from UI state so it disappears instantly
+      setAlerts(prev => prev.filter(a => a.id !== alertId));
       await resolveMaintenanceAlert(alertId);
       showToast(`Alert #${alertId} marked as resolved.`);
-      loadData();
+      fetchMaintenanceReportSummary().then(res => setSummary(res.data)).catch(() => {});
     } catch (err) {
       showToast('Failed to resolve alert.', true);
+      loadData();
+    }
+  };
+
+  const handleResolveAllAlerts = async () => {
+    if (window.confirm("Are you sure you want to resolve all active maintenance alerts across the fleet?")) {
+      try {
+        // Immediately clear alerts from UI state
+        setAlerts([]);
+        await resolveAllMaintenanceAlerts();
+        showToast("All active maintenance alerts marked as resolved.");
+        fetchMaintenanceReportSummary().then(res => setSummary(res.data)).catch(() => {});
+      } catch (err) {
+        showToast("Failed to resolve alerts.", true);
+        loadData();
+      }
     }
   };
 
@@ -135,9 +156,10 @@ export default function MaintenancePage({ user }) {
   };
 
   const getSeverityStyle = (sev) => {
-    switch (sev) {
-      case 'Critical': return { bg: 'rgba(239, 68, 68, 0.2)', text: '#f87171', border: '#ef4444' };
-      case 'High': return { bg: 'rgba(249, 115, 22, 0.2)', text: '#fb923c', border: '#f97316' };
+    switch (sev?.toLowerCase()) {
+      case 'critical': return { bg: 'rgba(239, 68, 68, 0.2)', text: '#f87171', border: '#ef4444' };
+      case 'high': return { bg: 'rgba(249, 115, 22, 0.2)', text: '#fb923c', border: '#f97316' };
+      case 'medium': return { bg: 'rgba(234, 179, 8, 0.2)', text: '#facc15', border: '#eab308' };
       default: return { bg: 'rgba(56, 189, 248, 0.2)', text: '#38bdf8', border: '#0284c7' };
     }
   };
@@ -199,43 +221,137 @@ export default function MaintenancePage({ user }) {
       )}
 
       {/* Active Alerts Banner */}
-      {alerts.length > 0 && (
-        <div style={maintStyles.alertsContainer}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '20px' }}>⚠️</span>
-            <h3 style={{ margin: 0, fontSize: '16px', color: '#f8fafc', fontWeight: '800' }}>
-              Active Maintenance Alerts ({alerts.length})
-            </h3>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Immediate mechanical intervention required</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {alerts.map(alt => {
-              const badge = getSeverityStyle(alt.severity);
-              return (
-                <div key={alt.id} style={{ ...maintStyles.alertItem, borderColor: badge.border }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: '800',
-                      background: badge.bg,
-                      color: badge.text
-                    }}>
-                      {alt.severity.toUpperCase()}
-                    </span>
-                    <span style={{ color: '#f8fafc', fontWeight: '700', fontSize: '13px' }}>🚛 {alt.vehicle_id}</span>
-                    <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{alt.message}</span>
-                  </div>
-                  <button onClick={() => handleResolveAlert(alt.id)} style={maintStyles.resolveBtn}>
-                    ✓ Resolve Alert
-                  </button>
+      {alerts.length > 0 && (() => {
+        const filteredAlerts = alerts.filter(alt => {
+          if (alertFilter === 'ALL') return true;
+          return (alt.severity || '').toLowerCase() === alertFilter.toLowerCase();
+        });
+        const critCount = alerts.filter(a => (a.severity || '').toLowerCase() === 'critical').length;
+        const highCount = alerts.filter(a => (a.severity || '').toLowerCase() === 'high').length;
+        const medCount = alerts.filter(a => (a.severity || '').toLowerCase() === 'medium').length;
+
+        return (
+          <div style={maintStyles.alertsContainer}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', color: '#f8fafc', fontWeight: '800' }}>
+                    Active Maintenance Alerts ({alerts.length})
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    Prioritized mechanical queue (throttled to {alertLimit} to reduce alert fatigue)
+                  </span>
                 </div>
-              );
-            })}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {/* Queue Cap selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(15, 23, 42, 0.6)', padding: '3px 8px', borderRadius: '6px', border: '1px solid #334155' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700' }}>Queue Cap:</span>
+                  {[10, 15, 20].map(lim => (
+                    <button
+                      key={lim}
+                      type="button"
+                      onClick={() => setAlertLimit(lim)}
+                      style={{
+                        background: alertLimit === lim ? '#0284c7' : 'transparent',
+                        color: alertLimit === lim ? '#ffffff' : '#94a3b8',
+                        border: 'none',
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {lim}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Resolve All Button */}
+                <button
+                  type="button"
+                  onClick={handleResolveAllAlerts}
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#34d399',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✓ Resolve All Alerts
+                </button>
+              </div>
+            </div>
+
+            {/* Severity Filter Chips */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              {[
+                { id: 'ALL', label: `All Alerts (${alerts.length})` },
+                { id: 'CRITICAL', label: `Critical (${critCount})` },
+                { id: 'HIGH', label: `High (${highCount})` },
+                { id: 'MEDIUM', label: `Medium (${medCount})` }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAlertFilter(tab.id)}
+                  style={{
+                    background: alertFilter === tab.id ? '#1e293b' : 'transparent',
+                    color: alertFilter === tab.id ? '#38bdf8' : '#94a3b8',
+                    border: `1px solid ${alertFilter === tab.id ? '#38bdf8' : '#334155'}`,
+                    borderRadius: '9999px',
+                    padding: '3px 10px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {filteredAlerts.map(alt => {
+                const badge = getSeverityStyle(alt.severity);
+                return (
+                  <div key={alt.id} style={{ ...maintStyles.alertItem, borderColor: badge.border }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        background: badge.bg,
+                        color: badge.text
+                      }}>
+                        {(alt.severity || 'HIGH').toUpperCase()}
+                      </span>
+                      <span style={{ color: '#f8fafc', fontWeight: '700', fontSize: '13px' }}>🚛 {alt.vehicle_id}</span>
+                      <span style={{ color: '#cbd5e1', fontSize: '13px' }}>{alt.message}</span>
+                    </div>
+                    <button onClick={() => handleResolveAlert(alt.id)} style={maintStyles.resolveBtn}>
+                      ✓ Resolve Alert
+                    </button>
+                  </div>
+                );
+              })}
+              {filteredAlerts.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '16px', fontSize: '13px' }}>
+                  No active alerts in this severity category.
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Category Overview */}
       <div style={maintStyles.categoryGrid}>

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -28,6 +28,27 @@ def calculate_route_optimization(req: schemas.RouteOptimizeRequest):
         optimization_type=req.optimization_type.value if req.optimization_type else "Fastest Route"
     )
     return result
+
+@router.post("/optimize-matrix", response_model=Dict[str, schemas.RouteOptimizeResponse])
+def calculate_route_matrix(req: schemas.RouteOptimizeRequest):
+    """
+    Evaluates all 4 multi-criteria route optimization profiles in a single call:
+    - Shortest Route
+    - Fastest Route
+    - Traffic Avoidance
+    - Fuel Efficient Route
+    """
+    waypoints = [tuple(w) for w in req.waypoints] if req.waypoints else []
+    strategies = ["Shortest Route", "Fastest Route", "Traffic Avoidance", "Fuel Efficient Route"]
+    results = {}
+    for strat in strategies:
+        results[strat] = RouteOptimizer.optimize_route(
+            origin=(req.origin_lat, req.origin_lng),
+            destination=(req.destination_lat, req.destination_lng),
+            waypoints=waypoints,
+            optimization_type=strat
+        )
+    return results
 
 @router.post("/schedule", response_model=schemas.TripResponse, status_code=status.HTTP_201_CREATED)
 def schedule_trip(req: schemas.TripScheduleRequest, db: Session = Depends(get_db)):

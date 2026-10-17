@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import case
 from typing import List, Optional
 from app.database import get_db
-from app.models import MaintenanceLog, MaintenanceAlert, MaintenanceStatus, UserRole
+from app.models import MaintenanceLog, MaintenanceAlert, MaintenanceStatus, UserRole, AlertSeverity
 from app.schemas import (
     MaintenanceCreate, MaintenanceUpdate, MaintenanceResponse,
     MaintenanceAlertResponse, MaintenanceReportSummary
@@ -46,13 +47,23 @@ def list_maintenance_jobs(
     return query.order_by(MaintenanceLog.scheduled_date.desc(), MaintenanceLog.id.desc()).all()
 
 @router.get("/alerts/active", response_model=List[MaintenanceAlertResponse])
-def get_active_maintenance_alerts(db: Session = Depends(get_db)):
-    """Retrieve active unresolved maintenance alerts (overdue jobs, critical mechanical warnings, high mileage)."""
-    # Trigger an on-the-fly alert check first
-    MaintenanceService.scan_all_maintenance_alerts(db)
+def get_active_maintenance_alerts(
+    limit: int = Query(15, ge=1, le=50, description="Maximum number of active alerts to retrieve (capped between 10-20)"),
+    db: Session = Depends(get_db)
+):
+    """Retrieve active unresolved maintenance alerts (capped between 10-20 to reduce alert fatigue)."""
+    # Priority sorting: Critical (1), High (2), Medium (3), Low (4), newest first
     return db.query(MaintenanceAlert).filter(
         MaintenanceAlert.is_resolved == False
-    ).order_by(MaintenanceAlert.created_at.desc()).all()
+    ).order_by(
+        case(
+            (MaintenanceAlert.severity == AlertSeverity.CRITICAL, 1),
+            (MaintenanceAlert.severity == AlertSeverity.HIGH, 2),
+            (MaintenanceAlert.severity == AlertSeverity.MEDIUM, 3),
+            else_=4
+        ),
+        MaintenanceAlert.created_at.desc()
+    ).limit(limit).all()
 
 @router.patch("/alerts/{alert_id}/resolve", response_model=MaintenanceAlertResponse)
 def resolve_maintenance_alert(alert_id: int, db: Session = Depends(get_db)):
@@ -61,6 +72,12 @@ def resolve_maintenance_alert(alert_id: int, db: Session = Depends(get_db)):
     if not alert:
         raise HTTPException(status_code=404, detail=f"Alert ID {alert_id} not found.")
     return alert
+
+@router.post("/alerts/resolve-all")
+def resolve_all_maintenance_alerts(db: Session = Depends(get_db)):
+    """Mark all active maintenance alerts as resolved."""
+    count = MaintenanceService.resolve_all_alerts(db)
+    return {"message": f"Successfully resolved {count} maintenance alerts", "resolved_count": count}
 
 @router.get("/reports/summary", response_model=MaintenanceReportSummary)
 def get_maintenance_report_summary(db: Session = Depends(get_db)):
